@@ -10,7 +10,7 @@ namespace PlayersClubsInfo
 {
     public class Program
     {
-        public static void Main(string[] args)
+        public static async Task Main(string[] args)
         {
             var builder = WebApplication.CreateBuilder(args);
 
@@ -53,6 +53,12 @@ namespace PlayersClubsInfo
             });
 
             var app = builder.Build();
+
+            // Seed roles and default root user
+            using (var scopeSeed = app.Services.CreateScope())
+            {
+                await IdentitySeeder.SeedAsync(scopeSeed.ServiceProvider);
+            }
 
             #region Test database connection
             // Test database connection
