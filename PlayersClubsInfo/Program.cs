@@ -1,5 +1,7 @@
+using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using PlayersClubsInfo.Data;
+using PlayersClubsInfo.Models;
 
 namespace PlayersClubsInfo
 {
@@ -22,8 +24,13 @@ namespace PlayersClubsInfo
                     builder.Configuration.GetConnectionString("DefaultConnection"));
             });
 
+            builder.Services.AddIdentity<Models.ApplicationUser, Microsoft.AspNetCore.Identity.IdentityRole>()
+                .AddEntityFrameworkStores<PlayersClubsInfoContext>()
+                .AddDefaultTokenProviders();
+
             var app = builder.Build();
 
+            #region Test database connection
             // Test database connection
             using var scope = app.Services.CreateScope();
 
@@ -44,7 +51,7 @@ namespace PlayersClubsInfo
             {
                 Console.WriteLine($"Database connection error: {ex.Message}");
             }
-
+            #endregion
 
             // Configure the HTTP request pipeline.
             if (app.Environment.IsDevelopment())

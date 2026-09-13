@@ -1,9 +1,10 @@
 ﻿using PlayersClubsInfo.Models;
+using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
 
 namespace PlayersClubsInfo.Data
 {
-    public class PlayersClubsInfoContext : DbContext
+    public class PlayersClubsInfoContext : IdentityDbContext<ApplicationUser>
     {
         public PlayersClubsInfoContext(DbContextOptions<PlayersClubsInfoContext> options) : base(options)
         {
