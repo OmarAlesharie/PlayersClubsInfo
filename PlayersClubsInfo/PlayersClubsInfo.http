@@ -1,6 +1,24 @@
-@PlayersClubsInfo_HostAddress = http://localhost:5235
+@PlayersClubsInfo_HostAddress = https://localhost:7123
 
 GET {{PlayersClubsInfo_HostAddress}}/weatherforecast/
 Accept: application/json
+
+###
+
+POST {{PlayersClubsInfo_HostAddress}}/api/auth/register
+Content-Type: application/json
+
+{
+  "username": "alice", "email": "alice@example.com", "password": "Passw0rd!"
+}
+
+###
+
+POST {{PlayersClubsInfo_HostAddress}}/api/auth/login
+Content-Type: application/json
+
+{
+  "username": "alice", "password": "Passw0rd!"
+}
 
 ###
