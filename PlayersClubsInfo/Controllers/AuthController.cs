@@ -166,8 +166,8 @@ namespace PlayersClubsInfo.Controllers
 
             var claims = new List<Claim>
             {
-                new(JwtRegisteredClaimNames.Sub, user.Id),
-                new(JwtRegisteredClaimNames.UniqueName, user.UserName!),
+                new(ClaimTypes.NameIdentifier, user.Id),
+                new(ClaimTypes.Name, user.UserName!),
                 new(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString())
             };
 
