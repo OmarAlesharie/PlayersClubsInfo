@@ -21,6 +21,9 @@ namespace PlayersClubsInfo
             // Add PlayerService to the DI container
             builder.Services.AddScoped<PlayerService>();
 
+            // Add ClubService to the DI container
+            builder.Services.AddScoped<ClubService>();
+
             // Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
             builder.Services.AddOpenApi();
 

@@ -4,6 +4,7 @@ using PlayersClubsInfo.Models;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using PlayersClubsInfo.Services;
 
 namespace PlayersClubsInfo.Controllers
 {
@@ -12,10 +13,12 @@ namespace PlayersClubsInfo.Controllers
     public class ClubsController : ControllerBase
     {
         private readonly PlayersClubsInfoContext _context;
+        private readonly ClubService _clubService;
 
-        public ClubsController(PlayersClubsInfoContext context)
+        public ClubsController(PlayersClubsInfoContext context, ClubService clubService)
         {
             _context = context;
+            _clubService = clubService;
         }
 
         // GET: api/Clubs
@@ -166,19 +169,15 @@ namespace PlayersClubsInfo.Controllers
         [Authorize(Roles = "Root")]
         public async Task<IActionResult> DeleteClub(int id)
         {
-            var club = await _context.Clubs.FindAsync(id);
+            var result = await _clubService.DeleteClubAsync(id);
 
-            if (club == null)
+            if (!result.Success)
             {
                 return NotFound(new
                 {
-                    message = "Club not found."
+                    message = result.Error
                 });
             }
-
-            _context.Clubs.Remove(club);
-
-            await _context.SaveChangesAsync();
 
             return NoContent();
         }
