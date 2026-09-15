@@ -5,6 +5,7 @@ using PlayersClubsInfo.Models;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
 using System.Text;
+using PlayersClubsInfo.Services;
 
 namespace PlayersClubsInfo
 {
@@ -15,8 +16,11 @@ namespace PlayersClubsInfo
             var builder = WebApplication.CreateBuilder(args);
 
             // Add services to the container.
-
             builder.Services.AddControllers();
+
+            // Add PlayerService to the DI container
+            builder.Services.AddScoped<PlayerService>();
+
             // Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
             builder.Services.AddOpenApi();
 

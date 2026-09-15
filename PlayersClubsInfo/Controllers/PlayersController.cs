@@ -4,6 +4,7 @@ using PlayersClubsInfo.Models;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using PlayersClubsInfo.Services;
 
 namespace PlayersClubsInfo.Controllers
 {
@@ -12,9 +13,12 @@ namespace PlayersClubsInfo.Controllers
     public class PlayersController : ControllerBase
     {
         private readonly PlayersClubsInfoContext _context;
-        public PlayersController(PlayersClubsInfoContext context)
+        private readonly PlayerService _playerService;
+
+        public PlayersController(PlayersClubsInfoContext context, PlayerService playerService)
         {
             _context = context;
+            _playerService = playerService;
         }
 
         // GET: api/players
@@ -183,6 +187,94 @@ namespace PlayersClubsInfo.Controllers
             await _context.SaveChangesAsync();
 
             return NoContent();
+        }
+
+        // POST: api/players/{id}/transfer
+        [HttpPost("{id:int}/transfer")]
+        [Authorize(Roles = "Root,Manager")]
+        public async Task<IActionResult> TransferPlayer(
+            int id,
+            TransferPlayerDto dto)
+        {
+            var result = await _playerService.TransferPlayerAsync(
+                id,
+                dto.ClubId);
+
+            if (!result.Success)
+            {
+                if (result.Error == "Player not found.")
+                {
+                    return NotFound(new
+                    {
+                        message = result.Error
+                    });
+                }
+
+                return BadRequest(new
+                {
+                    message = result.Error
+                });
+            }
+
+            var player = await _context.Players
+                .AsNoTracking()
+                .Where(p => p.Id == id)
+                .Select(p => new PlayerResponseDto
+                {
+                    Id = p.Id,
+                    Name = p.Name,
+                    Age = p.Age,
+                    Position = p.Position,
+                    ClubId = p.ClubId,
+                    ClubName = p.Club != null
+                        ? p.Club.Name
+                        : null
+                })
+                .FirstAsync();
+
+            return Ok(player);
+        }
+
+        // POST: api/players/{id}/release
+        [HttpPost("{id:int}/release")]
+        [Authorize(Roles = "Root,Manager")]
+        public async Task<IActionResult> ReleasePlayer(int id)
+        {
+            var result = await _playerService.ReleasePlayerAsync(id);
+
+            if (!result.Success)
+            {
+                if (result.Error == "Player not found.")
+                {
+                    return NotFound(new
+                    {
+                        message = result.Error
+                    });
+                }
+
+                return BadRequest(new
+                {
+                    message = result.Error
+                });
+            }
+
+            var player = await _context.Players
+                .AsNoTracking()
+                .Where(p => p.Id == id)
+                .Select(p => new PlayerResponseDto
+                {
+                    Id = p.Id,
+                    Name = p.Name,
+                    Age = p.Age,
+                    Position = p.Position,
+                    ClubId = p.ClubId,
+                    ClubName = p.Club != null
+                        ? p.Club.Name
+                        : null
+                })
+                .FirstAsync();
+
+            return Ok(player);
         }
     }
 }
