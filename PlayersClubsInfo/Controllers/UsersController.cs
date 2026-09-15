@@ -279,5 +279,42 @@ namespace PlayersClubsInfo.Controllers
 
             return NoContent();
         }
-    }
+
+        // PUT: api/users/{id}/password
+        [HttpPut("{id}/password")]
+        public async Task<IActionResult> ChangePassword(
+            string id,
+            ChangePasswordDto dto)
+        {
+            var user = await _userManager.FindByIdAsync(id);
+
+            if (user == null)
+            {
+                return NotFound(new
+                {
+                    message = "User not found."
+                });
+            }
+
+            // Generate a password-reset token.
+            var resetToken = await _userManager.GeneratePasswordResetTokenAsync(user);
+
+            var result = await _userManager.ResetPasswordAsync(
+                user,
+                resetToken,
+                dto.NewPassword);
+
+            if (!result.Succeeded)
+            {
+                return BadRequest(new
+                {
+                    errors = result.Errors.Select(e => e.Description)
+                });
+            }
+
+            return Ok(new
+            {
+                message = "Password changed successfully."
+            });
+        }
 }
