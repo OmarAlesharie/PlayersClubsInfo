@@ -9,7 +9,7 @@ namespace PlayersClubsInfo.Controllers
     [ApiController]
     [Route("api/[controller]")]
     [Authorize(Roles = "Root")]
-    public class UsersController: ControllerBase
+    public class UsersController : ControllerBase
     {
         private readonly UserManager<ApplicationUser> _userManager;
         private readonly RoleManager<IdentityRole> _roleManager;
@@ -317,4 +317,5 @@ namespace PlayersClubsInfo.Controllers
                 message = "Password changed successfully."
             });
         }
+    }
 }
