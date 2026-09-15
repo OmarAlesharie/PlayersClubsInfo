@@ -139,25 +139,9 @@ namespace PlayersClubsInfo.Controllers
                 });
             }
 
-            // If a club was specified, make sure it exists.
-            if (dto.ClubId.HasValue)
-            {
-                var clubExists = await _context.Clubs
-                    .AnyAsync(c => c.Id == dto.ClubId.Value);
-
-                if (!clubExists)
-                {
-                    return BadRequest(new
-                    {
-                        message = "The specified club does not exist."
-                    });
-                }
-            }
-
             player.Name = dto.Name;
             player.Age = dto.Age;
             player.Position = dto.Position;
-            player.ClubId = dto.ClubId;
 
             await _context.SaveChangesAsync();
 
