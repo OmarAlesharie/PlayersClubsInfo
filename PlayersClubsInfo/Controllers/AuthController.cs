@@ -1,13 +1,15 @@
-﻿using System.IdentityModel.Tokens.Jwt;
-using System.Security.Claims;
-using System.Text;
-using PlayersClubsInfo.DTOs;
-using PlayersClubsInfo.Models;
-using Microsoft.AspNetCore.Authorization;
+﻿using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
-using System.Security.Cryptography.X509Certificates;
+using PlayersClubsInfo.Data;
+using PlayersClubsInfo.DTOs;
+using PlayersClubsInfo.Models;
+using System.IdentityModel.Tokens.Jwt;
+using System.Security.Claims;
+using System.Security.Cryptography;
+using System.Text;
 
 namespace PlayersClubsInfo.Controllers
 {
@@ -18,13 +20,15 @@ namespace PlayersClubsInfo.Controllers
         private readonly UserManager<ApplicationUser> _userManager;
         private readonly SignInManager<ApplicationUser> _signInManager;
         private readonly IConfiguration _configuration;
+        private readonly PlayersClubsInfoContext _db;
 
 
-        public AuthController(UserManager<ApplicationUser> userManager, SignInManager<ApplicationUser> signInManager, IConfiguration configuration)
+        public AuthController(UserManager<ApplicationUser> userManager, SignInManager<ApplicationUser> signInManager, IConfiguration configuration, PlayersClubsInfoContext db)
         {
             _userManager = userManager;
             _signInManager = signInManager;
             _configuration = configuration;
+            _db = db;
         }
 
         // POST: api/auth/register
@@ -112,6 +116,21 @@ namespace PlayersClubsInfo.Controllers
                 });
             }
 
+            // Generate a refresh token and store it in the database
+            var refreshToken = GenerateSecureRefreshToken();
+            var refreshTokenRecord = new RefreshToken
+            {
+                UserId = user.Id,
+                TokenHash = HashToken(refreshToken),
+                Created = DateTime.UtcNow,
+                Expires = DateTime.UtcNow.AddDays(7), // adjust lifetime
+                Revoked = false
+            };
+
+            await _db.RefreshTokens.AddAsync(refreshTokenRecord);
+            await _db.SaveChangesAsync();
+
+
             var roles = await _userManager.GetRolesAsync(user);
             var token = GenerateJwtToken(user, roles);
 
@@ -120,48 +139,55 @@ namespace PlayersClubsInfo.Controllers
                 Token = token.Token,
                 ExpiresAt = token.ExpiresAt,
                 Username = user.UserName!,
-                Roles = roles
+                Roles = roles,
+                RefreshToken = refreshToken
             });
         }
 
         // POST: api/auth/logout
         [HttpPost("logout")]
         [Authorize]
-        public IActionResult Logout()
+        public async Task<IActionResult> Logout([FromBody] RevokeRequestDto dto)
         {
-            /*
-             * JWT authentication is stateless.
-             *
-             * There is no server-side session to destroy.
-             * The client should delete its JWT after receiving
-             * this response.
-             */
+            var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+            if (userId == null) return Unauthorized();
 
-            return Ok(new
+            var hash = HashToken(dto.RefreshToken);
+            var token = await _db.RefreshTokens.FirstOrDefaultAsync(t => t.TokenHash == hash && t.UserId == userId);
+            if (token != null && !token.Revoked)
             {
-                message = "Logout successful. Please remove the JWT from the client."
-            });
+                token.Revoked = true;
+                token.RevokedAt = DateTime.UtcNow;
+                await _db.SaveChangesAsync();
+            }
+
+            return Ok(new { message = "Logout successful. Refresh token revoked." });
         }
 
-        private (string Token, DateTime ExpiresAt) GenerateJwtToken(
-        ApplicationUser user,
-        IList<string> roles)
+        [HttpPost("logout-all")]
+        [Authorize]
+        public async Task<IActionResult> LogoutAll()
         {
-            var jwtKey = _configuration["Jwt:Key"]
-                ?? throw new InvalidOperationException(
-                    "JWT Key is not configured.");
+            var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+            if (userId == null) return Unauthorized();
 
-            var issuer = _configuration["Jwt:Issuer"]
-                ?? throw new InvalidOperationException(
-                    "JWT Issuer is not configured.");
+            var tokens = _db.RefreshTokens.Where(t => t.UserId == userId && !t.Revoked);
+            await tokens.ForEachAsync(t => {
+                t.Revoked = true;
+                t.RevokedAt = DateTime.UtcNow;
+            });
 
-            var audience = _configuration["Jwt:Audience"]
-                ?? throw new InvalidOperationException(
-                    "JWT Audience is not configured.");
+            await _db.SaveChangesAsync();
 
-            var expirationMinutes =
-                _configuration.GetValue<int>("Jwt:ExpirationMinutes");
+            return Ok(new { message = "All refresh tokens revoked." });
+        }
 
+        private (string Token, DateTime ExpiresAt) GenerateJwtToken( ApplicationUser user, IList<string> roles)
+        {
+            var jwtKey = _configuration["Jwt:Key"] ?? throw new InvalidOperationException("JWT Key is not configured.");
+            var issuer = _configuration["Jwt:Issuer"] ?? throw new InvalidOperationException("JWT Issuer is not configured.");
+            var audience = _configuration["Jwt:Audience"] ?? throw new InvalidOperationException("JWT Audience is not configured.");
+            var expirationMinutes = _configuration.GetValue<int>("Jwt:ExpirationMinutes");
             var expiresAt = DateTime.UtcNow.AddMinutes(expirationMinutes);
 
             var claims = new List<Claim>
@@ -176,12 +202,8 @@ namespace PlayersClubsInfo.Controllers
                 claims.Add(new Claim(ClaimTypes.Role, role));
             }
 
-            var key = new SymmetricSecurityKey(
-                Encoding.UTF8.GetBytes(jwtKey));
-
-            var credentials = new SigningCredentials(
-                key,
-                SecurityAlgorithms.HmacSha256);
+            var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtKey));
+            var credentials = new SigningCredentials(key,SecurityAlgorithms.HmacSha256);
 
             var token = new JwtSecurityToken(
                 issuer: issuer,
@@ -198,8 +220,7 @@ namespace PlayersClubsInfo.Controllers
         // PUT: api/auth/change-password
         [HttpPut("change-password")]
         [Authorize]
-        public async Task<IActionResult> ChangePassword(
-            ChangeOwnPasswordDto dto)
+        public async Task<IActionResult> ChangePassword(ChangeOwnPasswordDto dto)
         {
             var userId = User.FindFirstValue(
                 ClaimTypes.NameIdentifier);
@@ -239,6 +260,68 @@ namespace PlayersClubsInfo.Controllers
             {
                 message = "Password changed successfully."
             });
+        }
+
+        [HttpPost("refresh")]
+        [AllowAnonymous]
+        public async Task<IActionResult> Refresh([FromBody] RefreshRequestDto dto)
+        {
+            if (string.IsNullOrWhiteSpace(dto.RefreshToken))
+                return BadRequest(new { message = "Refresh token is required." });
+
+            var incomingHash = HashToken(dto.RefreshToken);
+            var existing = await _db.RefreshTokens
+                .FirstOrDefaultAsync(t => t.TokenHash == incomingHash);
+
+            if (existing == null || existing.Revoked || existing.Expires <= DateTime.UtcNow)
+                return Unauthorized(new { message = "Invalid or expired refresh token." });
+
+            // rotate: revoke existing and create new
+            existing.Revoked = true;
+            existing.RevokedAt = DateTime.UtcNow;
+
+            var newRefreshToken = GenerateSecureRefreshToken();
+            var newRecord = new RefreshToken
+            {
+                UserId = existing.UserId,
+                TokenHash = HashToken(newRefreshToken),
+                Created = DateTime.UtcNow,
+                Expires = DateTime.UtcNow.AddDays(7),
+                Revoked = false
+            };
+            existing.ReplacedByTokenHash = newRecord.TokenHash;
+
+            _db.RefreshTokens.Add(newRecord);
+            await _db.SaveChangesAsync();
+
+            var user = await _userManager.FindByIdAsync(existing.UserId);
+            var roles = await _userManager.GetRolesAsync(user!);
+            var newJwt = GenerateJwtToken(user!, roles);
+
+            return Ok(new AuthResponseDto
+            {
+                Token = newJwt.Token,
+                ExpiresAt = newJwt.ExpiresAt,
+                Username = user!.UserName!,
+                Roles = roles,
+                RefreshToken = newRefreshToken
+            });
+        }
+
+        private static string HashToken(string token)
+        {
+            using var sha = SHA256.Create();
+            var bytes = System.Text.Encoding.UTF8.GetBytes(token);
+            var hash = sha.ComputeHash(bytes);
+            return Convert.ToBase64String(hash);
+        }
+
+        private static string GenerateSecureRefreshToken()
+        {
+            var bytes = new byte[64];
+            using var rng = RandomNumberGenerator.Create();
+            rng.GetBytes(bytes);
+            return Convert.ToBase64String(bytes);
         }
     }
 }
