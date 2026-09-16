@@ -6,6 +6,7 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
 using System.Text;
 using PlayersClubsInfo.Services;
+using Scalar.AspNetCore;
 
 namespace PlayersClubsInfo
 {
@@ -23,6 +24,7 @@ namespace PlayersClubsInfo
 
             // Add ClubService to the DI container
             builder.Services.AddScoped<ClubService>();
+
 
             // Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
             builder.Services.AddOpenApi();
@@ -94,6 +96,7 @@ namespace PlayersClubsInfo
             if (app.Environment.IsDevelopment())
             {
                 app.MapOpenApi();
+                app.MapScalarApiReference();
             }
 
             app.UseHttpsRedirection();
