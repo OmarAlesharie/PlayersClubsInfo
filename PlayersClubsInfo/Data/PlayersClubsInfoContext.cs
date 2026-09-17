@@ -13,6 +13,7 @@ namespace PlayersClubsInfo.Data
         public DbSet<Club> Clubs => Set<Club>();
         public DbSet<Player> Players => Set<Player>();
         public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
+        public DbSet<RevokedAccessToken> RevokedAccessTokens => Set<RevokedAccessToken>();
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -23,6 +24,14 @@ namespace PlayersClubsInfo.Data
                 .WithMany(c => c.Players)
                 .HasForeignKey(p => p.ClubId)
                 .OnDelete(DeleteBehavior.SetNull);
+
+            modelBuilder.Entity<RevokedAccessToken>(entity =>
+            {
+                entity.HasKey(e => e.Id);
+                entity.Property(e => e.Jti).IsRequired().HasMaxLength(128);
+                entity.Property(e => e.ExpiresAt).IsRequired();
+                entity.HasIndex(e => e.Jti).IsUnique(false);
+            });
 
             modelBuilder.Entity<RefreshToken>(entity =>
             {

@@ -152,16 +152,40 @@ namespace PlayersClubsInfo.Controllers
             var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
             if (userId == null) return Unauthorized();
 
-            var hash = HashToken(dto.RefreshToken);
-            var token = await _db.RefreshTokens.FirstOrDefaultAsync(t => t.TokenHash == hash && t.UserId == userId);
-            if (token != null && !token.Revoked)
+            // 1) Revoke refresh token if provided
+            if (!string.IsNullOrWhiteSpace(dto?.RefreshToken))
             {
-                token.Revoked = true;
-                token.RevokedAt = DateTime.UtcNow;
-                await _db.SaveChangesAsync();
+                var hash = HashToken(dto.RefreshToken);
+                var rtoken = await _db.RefreshTokens.FirstOrDefaultAsync(t => t.TokenHash == hash && t.UserId == userId);
+                if (rtoken != null && !rtoken.Revoked)
+                {
+                    rtoken.Revoked = true;
+                    rtoken.RevokedAt = DateTime.UtcNow;
+                }
             }
 
-            return Ok(new { message = "Logout successful. Refresh token revoked." });
+            // 2) Revoke current access token immediately by storing its JTI
+            var jti = User.FindFirstValue(JwtRegisteredClaimNames.Jti) ?? User.FindFirstValue("jti");
+            if (!string.IsNullOrEmpty(jti))
+            {
+                // get exp claim to set expiry for cleanup
+                DateTime expiresAt;
+                var expClaim = User.FindFirstValue(JwtRegisteredClaimNames.Exp);
+                if (!string.IsNullOrEmpty(expClaim) && long.TryParse(expClaim, out var seconds))
+                    expiresAt = DateTimeOffset.FromUnixTimeSeconds(seconds).UtcDateTime;
+                else
+                    expiresAt = DateTime.UtcNow.AddMinutes(_configuration.GetValue<int>("Jwt:ExpirationMinutes"));
+
+                _db.RevokedAccessTokens.Add(new RevokedAccessToken
+                {
+                    Jti = jti,
+                    ExpiresAt = expiresAt
+                });
+            }
+
+            await _db.SaveChangesAsync();
+
+            return Ok(new { message = "Logout successful. Refresh token revoked and access token invalidated." });
         }
 
         [HttpPost("logout-all")]

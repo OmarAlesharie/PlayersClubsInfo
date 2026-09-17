@@ -7,6 +7,7 @@ using Microsoft.IdentityModel.Tokens;
 using System.Text;
 using PlayersClubsInfo.Services;
 using Scalar.AspNetCore;
+using System.IdentityModel.Tokens.Jwt;
 
 namespace PlayersClubsInfo
 {
@@ -57,7 +58,30 @@ namespace PlayersClubsInfo
                     ValidateIssuerSigningKey = true,
                     ValidIssuer = builder.Configuration["Jwt:Issuer"],
                     ValidAudience = builder.Configuration["Jwt:Audience"],
-                    IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(builder.Configuration["Jwt:Key"] ?? throw new InvalidOperationException("JWT Key is not configured.")))
+                    IssuerSigningKey = new SymmetricSecurityKey(
+                        Encoding.UTF8.GetBytes(builder.Configuration["Jwt:Key"]
+                            ?? throw new InvalidOperationException("JWT Key is not configured."))),
+                    // tighten clock skew when using short-lived tokens
+                    ClockSkew = TimeSpan.FromSeconds(30)
+                };
+
+                options.Events = new JwtBearerEvents
+                {
+                    OnTokenValidated = async context =>
+                    {
+                        var jti = context.Principal?.FindFirst(JwtRegisteredClaimNames.Jti)?.Value;
+                        if (string.IsNullOrEmpty(jti))
+                            return;
+
+                        var db = context.HttpContext.RequestServices.GetRequiredService<PlayersClubsInfoContext>();
+
+                        // ensure RevokedAccessTokens DbSet/model + migration exist
+                        var revoked = await db.RevokedAccessTokens.AnyAsync(r => r.Jti == jti);
+                        if (revoked)
+                        {
+                            context.Fail("Token has been revoked.");
+                        }
+                    }
                 };
             });
 
