@@ -2,7 +2,7 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
-using Microsoft.OpenApi.Models;
+using Microsoft.OpenApi;
 using PlayersClubsInfo.Data;
 using PlayersClubsInfo.Services;
 using Scalar.AspNetCore;
@@ -26,9 +26,6 @@ namespace PlayersClubsInfo
             // Add ClubService to the DI container
             builder.Services.AddScoped<ClubService>();
 
-
-            // Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
-            //builder.Services.AddOpenApi();
 
             // Add DbContext with PostgreSQL connection
             builder.Services.AddDbContext<PlayersClubsInfoContext>(options =>
@@ -98,20 +95,11 @@ namespace PlayersClubsInfo
                     Description = "Enter your JWT token."
                 });
 
-                options.AddSecurityRequirement(new OpenApiSecurityRequirement
-                {
+                options.AddSecurityRequirement(document =>
+                    new OpenApiSecurityRequirement
                     {
-                        new OpenApiSecurityScheme
-                        {
-                            Reference = new OpenApiReference
-                            {
-                                Type = ReferenceType.SecurityScheme,
-                                Id = "Bearer"
-                            }
-                        },
-                        Array.Empty<string>()
-                    }
-                });
+                        [new OpenApiSecuritySchemeReference("Bearer", document)] = []
+                    });
             });
 
             var app = builder.Build();
@@ -148,8 +136,10 @@ namespace PlayersClubsInfo
             // Configure the HTTP request pipeline.
             if (app.Environment.IsDevelopment())
             {
-                //app.MapOpenApi();
-                app.MapScalarApiReference();
+                app.MapScalarApiReference(options =>
+                {
+                    options.WithOpenApiRoutePattern("/swagger/{documentName}/swagger.json");
+                });
                 app.UseSwagger();
                 app.UseSwaggerUI();
             }
