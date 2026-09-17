@@ -85,6 +85,9 @@ namespace PlayersClubsInfo
                 };
             });
 
+            builder.Services.AddEndpointsApiExplorer();
+            builder.Services.AddSwaggerGen();
+
             var app = builder.Build();
 
             // Seed roles and default root user
@@ -121,6 +124,8 @@ namespace PlayersClubsInfo
             {
                 app.MapOpenApi();
                 app.MapScalarApiReference();
+                app.UseSwagger();
+                app.UseSwaggerUI();
             }
 
             app.UseHttpsRedirection();
