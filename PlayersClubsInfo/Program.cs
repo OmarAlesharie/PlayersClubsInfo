@@ -1,13 +1,13 @@
+using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
-using PlayersClubsInfo.Data;
-using PlayersClubsInfo.Models;
-using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
-using System.Text;
+using Microsoft.OpenApi.Models;
+using PlayersClubsInfo.Data;
 using PlayersClubsInfo.Services;
 using Scalar.AspNetCore;
 using System.IdentityModel.Tokens.Jwt;
+using System.Text;
 
 namespace PlayersClubsInfo
 {
@@ -28,7 +28,7 @@ namespace PlayersClubsInfo
 
 
             // Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
-            builder.Services.AddOpenApi();
+            //builder.Services.AddOpenApi();
 
             // Add DbContext with PostgreSQL connection
             builder.Services.AddDbContext<PlayersClubsInfoContext>(options =>
@@ -86,7 +86,33 @@ namespace PlayersClubsInfo
             });
 
             builder.Services.AddEndpointsApiExplorer();
-            builder.Services.AddSwaggerGen();
+            builder.Services.AddSwaggerGen(options =>
+            {
+                options.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
+                {
+                    Name = "Authorization",
+                    Type = SecuritySchemeType.Http,
+                    Scheme = "bearer",
+                    BearerFormat = "JWT",
+                    In = ParameterLocation.Header,
+                    Description = "Enter your JWT token."
+                });
+
+                options.AddSecurityRequirement(new OpenApiSecurityRequirement
+                {
+                    {
+                        new OpenApiSecurityScheme
+                        {
+                            Reference = new OpenApiReference
+                            {
+                                Type = ReferenceType.SecurityScheme,
+                                Id = "Bearer"
+                            }
+                        },
+                        Array.Empty<string>()
+                    }
+                });
+            });
 
             var app = builder.Build();
 
@@ -122,7 +148,7 @@ namespace PlayersClubsInfo
             // Configure the HTTP request pipeline.
             if (app.Environment.IsDevelopment())
             {
-                app.MapOpenApi();
+                //app.MapOpenApi();
                 app.MapScalarApiReference();
                 app.UseSwagger();
                 app.UseSwaggerUI();
