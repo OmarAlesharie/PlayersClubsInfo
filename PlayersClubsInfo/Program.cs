@@ -34,6 +34,9 @@ namespace PlayersClubsInfo
                     builder.Configuration.GetConnectionString("DefaultConnection"));
             });
 
+            // Add TokenCleanupService as a hosted service
+            builder.Services.AddHostedService<PlayersClubsInfo.Services.TokenCleanupService>();
+
             // Add Identity services
             builder.Services.AddIdentity<Models.ApplicationUser, Microsoft.AspNetCore.Identity.IdentityRole>()
                 .AddEntityFrameworkStores<PlayersClubsInfoContext>()
