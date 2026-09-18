@@ -1,4 +1,9 @@
-﻿using Microsoft.AspNetCore.Identity;
+﻿using System;
+using System.Linq;
+using System.Threading.Tasks;
+using Microsoft.AspNetCore.Identity;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
 using PlayersClubsInfo.Models;
 
 namespace PlayersClubsInfo.Data
@@ -10,14 +15,15 @@ namespace PlayersClubsInfo.Data
         {
             var roleManager = serviceProvider.GetRequiredService<RoleManager<IdentityRole>>();
             var userManager = serviceProvider.GetRequiredService<UserManager<ApplicationUser>>();
+            var configuration = serviceProvider.GetRequiredService<IConfiguration>();
 
-            // Create roles
-            string[] roles =
-                [
-                    "Root",
-                    "Manager",
-                    "User"
-                ];
+            // Roles
+            string[] roles = new[]
+            {
+                "Root",
+                "Manager",
+                "User"
+            };
 
             foreach (var role in roles)
             {
@@ -27,10 +33,17 @@ namespace PlayersClubsInfo.Data
                 }
             }
 
-            // Create a default root user
-            const string rootUsername = "root";
-            const string rootEmail = "root@clubsinfo.local";
-            const string rootPassword = "ChangeMe123!";
+            // Read default root user from configuration (appsettings.json, user-secrets, env vars, Key Vault, etc.)
+            var adminSection = configuration.GetSection("AdminUser");
+            var rootUsername = adminSection["Username"] ?? "root";
+            var rootEmail = adminSection["Email"] ?? "root@clubsinfo.local";
+            var rootPassword = adminSection["Password"];
+
+            if (string.IsNullOrWhiteSpace(rootPassword))
+            {
+                throw new InvalidOperationException(
+                    "AdminUser:Password not configured. Set the password in configuration (appsettings, user-secrets, environment variables, or a secret store).");
+            }
 
             var rootUser = await userManager.FindByNameAsync(rootUsername);
 
@@ -43,38 +56,27 @@ namespace PlayersClubsInfo.Data
                     EmailConfirmed = true
                 };
 
-                var result =
-                    await userManager.CreateAsync(
-                        rootUser,
-                        rootPassword);
+                var createResult = await userManager.CreateAsync(rootUser, rootPassword);
 
-                if (!result.Succeeded)
+                if (!createResult.Succeeded)
                 {
-                    var errors = string.Join(
-                        ", ",
-                        result.Errors.Select(e => e.Description));
-
-                    throw new InvalidOperationException(
-                        $"Failed to create Root user: {errors}");
+                    var errors = string.Join(", ", createResult.Errors.Select(e => e.Description));
+                    throw new InvalidOperationException($"Failed to create Root user: {errors}");
                 }
             }
 
-            // Make sure Root user has Root role
+            // Ensure rootUser reference is up-to-date (in case it was created above)
+            rootUser = await userManager.FindByNameAsync(rootUsername)
+                       ?? throw new InvalidOperationException("Root user not found after creation.");
+
+            // Ensure Root role assignment
             if (!await userManager.IsInRoleAsync(rootUser, "Root"))
             {
-                var result =
-                    await userManager.AddToRoleAsync(
-                        rootUser,
-                        "Root");
-
-                if (!result.Succeeded)
+                var addRoleResult = await userManager.AddToRoleAsync(rootUser, "Root");
+                if (!addRoleResult.Succeeded)
                 {
-                    var errors = string.Join(
-                        ", ",
-                        result.Errors.Select(e => e.Description));
-
-                    throw new InvalidOperationException(
-                        $"Failed to assign Root role: {errors}");
+                    var errors = string.Join(", ", addRoleResult.Errors.Select(e => e.Description));
+                    throw new InvalidOperationException($"Failed to assign Root role: {errors}");
                 }
             }
         }
