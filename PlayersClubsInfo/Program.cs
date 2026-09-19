@@ -17,13 +17,53 @@ namespace PlayersClubsInfo
         {
             var builder = WebApplication.CreateBuilder(args);
 
-            // Load Docker Secrets from /run/secrets
-            builder.Configuration.AddKeyPerFile(
-                directoryPath: "/run/secrets",
-                optional: true,
-                reloadOnChange: false);
+            // =========================================================
+            // Docker Secrets
+            // =========================================================
 
-            // Add services to the container.
+            static string ReadDockerSecret(string secretName)
+            {
+                var path = Path.Combine("/run/secrets", secretName);
+
+                if (!File.Exists(path))
+                {
+                    throw new InvalidOperationException(
+                        $"Docker secret '{secretName}' was not found at '{path}'.");
+                }
+
+                var value = File.ReadAllText(path).Trim();
+
+                if (string.IsNullOrWhiteSpace(value))
+                {
+                    throw new InvalidOperationException(
+                        $"Docker secret '{secretName}' is empty.");
+                }
+
+                return value;
+            }
+
+            var postgresPassword =
+                ReadDockerSecret("postgres-password");
+
+            var jwtKey =
+                ReadDockerSecret("jwt-key");
+
+            var adminPassword =
+                ReadDockerSecret("admin-password");
+
+            // Make Docker Secret values available through the normal
+            // ASP.NET Core configuration system.
+            builder.Configuration.AddInMemoryCollection(
+                new Dictionary<string, string?>
+                {
+                    ["Jwt:Key"] = jwtKey,
+                    ["AdminUser:Password"] = adminPassword
+                });
+
+            // =========================================================
+            // Services
+            // =========================================================
+
             builder.Services.AddControllers();
 
             // Add PlayerService to the DI container
@@ -32,20 +72,15 @@ namespace PlayersClubsInfo
             // Add ClubService to the DI container
             builder.Services.AddScoped<ClubService>();
 
-            // Build PostgreSQL connection string
+            // =========================================================
+            // PostgreSQL
+            // =========================================================
+
             var connectionString =
-                builder.Configuration.GetConnectionString("DefaultConnection")
+                builder.Configuration.GetConnectionString(
+                    "DefaultConnection")
                 ?? throw new InvalidOperationException(
                     "DefaultConnection is not configured.");
-
-            var postgresPassword =
-                builder.Configuration["PostgresPassword"];
-
-            if (string.IsNullOrWhiteSpace(postgresPassword))
-            {
-                throw new InvalidOperationException(
-                    "PostgreSQL password is not configured.");
-            }
 
             var connectionStringBuilder =
                 new Npgsql.NpgsqlConnectionStringBuilder(connectionString)
@@ -53,23 +88,33 @@ namespace PlayersClubsInfo
                     Password = postgresPassword
                 };
 
-            // Add DbContext with PostgreSQL connection
-            builder.Services.AddDbContext<PlayersClubsInfoContext>(options =>
-            {
-                options.UseNpgsql(connectionStringBuilder.ConnectionString);
-            });
+            builder.Services.AddDbContext<PlayersClubsInfoContext>(
+                options =>
+                {
+                    options.UseNpgsql(
+                        connectionStringBuilder.ConnectionString);
+                });
 
-            // Add TokenCleanupService as a hosted service
+            // =========================================================
+            // Token cleanup
+            // =========================================================
+
             builder.Services.AddHostedService<TokenCleanupService>();
 
-            // Add Identity services
+            // =========================================================
+            // ASP.NET Core Identity
+            // =========================================================
+
             builder.Services.AddIdentity<
                 Models.ApplicationUser,
                 IdentityRole>()
                 .AddEntityFrameworkStores<PlayersClubsInfoContext>()
                 .AddDefaultTokenProviders();
 
-            // Add JWT authentication
+            // =========================================================
+            // JWT Authentication
+            // =========================================================
+
             builder.Services.AddAuthentication(options =>
             {
                 options.DefaultAuthenticateScheme =
@@ -101,6 +146,7 @@ namespace PlayersClubsInfo
                                     ?? throw new InvalidOperationException(
                                         "JWT Key is not configured."))),
 
+                        // Tight clock skew for short-lived tokens.
                         ClockSkew = TimeSpan.FromSeconds(30)
                     };
 
@@ -109,14 +155,16 @@ namespace PlayersClubsInfo
                     OnTokenValidated = async context =>
                     {
                         var jti = context.Principal?
-                            .FindFirst(JwtRegisteredClaimNames.Jti)?.Value;
+                            .FindFirst(JwtRegisteredClaimNames.Jti)
+                            ?.Value;
 
                         if (string.IsNullOrEmpty(jti))
                             return;
 
                         var db = context.HttpContext
                             .RequestServices
-                            .GetRequiredService<PlayersClubsInfoContext>();
+                            .GetRequiredService<
+                                PlayersClubsInfoContext>();
 
                         var revoked =
                             await db.RevokedAccessTokens
@@ -129,6 +177,10 @@ namespace PlayersClubsInfo
                     }
                 };
             });
+
+            // =========================================================
+            // Swagger
+            // =========================================================
 
             builder.Services.AddEndpointsApiExplorer();
 
@@ -241,8 +293,8 @@ namespace PlayersClubsInfo
                 app.UseSwaggerUI();
             }
 
-            // HTTPS is intentionally not enabled for the initial
-            // Docker development setup.
+            // HTTPS is intentionally disabled for the initial
+            // Docker development environment.
             //
             // app.UseHttpsRedirection();
 

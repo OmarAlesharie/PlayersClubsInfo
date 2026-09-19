@@ -1,0 +1,77 @@
+services:
+
+  postgres:
+    image: postgres:17
+
+    container_name: playersclubsinfo-postgres
+
+    environment:
+      POSTGRES_DB: PlayersClubsInfo
+      POSTGRES_USER: football
+      POSTGRES_PASSWORD_FILE: /run/secrets/postgres-password
+
+    secrets:
+      - postgres-password
+
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+
+    ports:
+      - "5432:5432"
+
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "pg_isready -U football -d PlayersClubsInfo"
+        ]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+
+    container_name: playersclubsinfo-api
+
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      ASPNETCORE_HTTP_PORTS: 8080
+
+    secrets:
+      - postgres-password
+      - jwt-key
+      - admin-password
+
+    volumes:
+      - aspnet-data-protection:/root/.aspnet/DataProtection-Keys
+
+    ports:
+      - "8080:8080"
+
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+
+volumes:
+
+  postgres-data:
+
+  aspnet-data-protection:
+
+
+secrets:
+
+  postgres-password:
+    file: ./secrets/postgres-password.txt
+
+  jwt-key:
+    file: ./secrets/jwt-key.txt
+
+  admin-password:
+    file: ./secrets/admin-password.txt
