@@ -17,6 +17,12 @@ namespace PlayersClubsInfo
         {
             var builder = WebApplication.CreateBuilder(args);
 
+            // Load Docker Secrets from /run/secrets
+            builder.Configuration.AddKeyPerFile(
+                directoryPath: "/run/secrets",
+                optional: true,
+                reloadOnChange: false);
+
             // Add services to the container.
             builder.Services.AddControllers();
 
@@ -26,57 +32,96 @@ namespace PlayersClubsInfo
             // Add ClubService to the DI container
             builder.Services.AddScoped<ClubService>();
 
+            // Build PostgreSQL connection string
+            var connectionString =
+                builder.Configuration.GetConnectionString("DefaultConnection")
+                ?? throw new InvalidOperationException(
+                    "DefaultConnection is not configured.");
+
+            var postgresPassword =
+                builder.Configuration["PostgresPassword"];
+
+            if (string.IsNullOrWhiteSpace(postgresPassword))
+            {
+                throw new InvalidOperationException(
+                    "PostgreSQL password is not configured.");
+            }
+
+            var connectionStringBuilder =
+                new Npgsql.NpgsqlConnectionStringBuilder(connectionString)
+                {
+                    Password = postgresPassword
+                };
 
             // Add DbContext with PostgreSQL connection
             builder.Services.AddDbContext<PlayersClubsInfoContext>(options =>
             {
-                options.UseNpgsql(
-                    builder.Configuration.GetConnectionString("DefaultConnection"));
+                options.UseNpgsql(connectionStringBuilder.ConnectionString);
             });
 
             // Add TokenCleanupService as a hosted service
-            builder.Services.AddHostedService<PlayersClubsInfo.Services.TokenCleanupService>();
+            builder.Services.AddHostedService<TokenCleanupService>();
 
             // Add Identity services
-            builder.Services.AddIdentity<Models.ApplicationUser, Microsoft.AspNetCore.Identity.IdentityRole>()
+            builder.Services.AddIdentity<
+                Models.ApplicationUser,
+                IdentityRole>()
                 .AddEntityFrameworkStores<PlayersClubsInfoContext>()
                 .AddDefaultTokenProviders();
-            
+
             // Add JWT authentication
             builder.Services.AddAuthentication(options =>
             {
-                options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
-                options.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
+                options.DefaultAuthenticateScheme =
+                    JwtBearerDefaults.AuthenticationScheme;
+
+                options.DefaultChallengeScheme =
+                    JwtBearerDefaults.AuthenticationScheme;
             })
             .AddJwtBearer(options =>
             {
-                options.TokenValidationParameters = new TokenValidationParameters
-                {
-                    ValidateIssuer = true,
-                    ValidateAudience = true,
-                    ValidateLifetime = true,
-                    ValidateIssuerSigningKey = true,
-                    ValidIssuer = builder.Configuration["Jwt:Issuer"],
-                    ValidAudience = builder.Configuration["Jwt:Audience"],
-                    IssuerSigningKey = new SymmetricSecurityKey(
-                        Encoding.UTF8.GetBytes(builder.Configuration["Jwt:Key"]
-                            ?? throw new InvalidOperationException("JWT Key is not configured."))),
-                    // tighten clock skew when using short-lived tokens
-                    ClockSkew = TimeSpan.FromSeconds(30)
-                };
+                options.TokenValidationParameters =
+                    new TokenValidationParameters
+                    {
+                        ValidateIssuer = true,
+                        ValidateAudience = true,
+                        ValidateLifetime = true,
+                        ValidateIssuerSigningKey = true,
+
+                        ValidIssuer =
+                            builder.Configuration["Jwt:Issuer"],
+
+                        ValidAudience =
+                            builder.Configuration["Jwt:Audience"],
+
+                        IssuerSigningKey =
+                            new SymmetricSecurityKey(
+                                Encoding.UTF8.GetBytes(
+                                    builder.Configuration["Jwt:Key"]
+                                    ?? throw new InvalidOperationException(
+                                        "JWT Key is not configured."))),
+
+                        ClockSkew = TimeSpan.FromSeconds(30)
+                    };
 
                 options.Events = new JwtBearerEvents
                 {
                     OnTokenValidated = async context =>
                     {
-                        var jti = context.Principal?.FindFirst(JwtRegisteredClaimNames.Jti)?.Value;
+                        var jti = context.Principal?
+                            .FindFirst(JwtRegisteredClaimNames.Jti)?.Value;
+
                         if (string.IsNullOrEmpty(jti))
                             return;
 
-                        var db = context.HttpContext.RequestServices.GetRequiredService<PlayersClubsInfoContext>();
+                        var db = context.HttpContext
+                            .RequestServices
+                            .GetRequiredService<PlayersClubsInfoContext>();
 
-                        // ensure RevokedAccessTokens DbSet/model + migration exist
-                        var revoked = await db.RevokedAccessTokens.AnyAsync(r => r.Jti == jti);
+                        var revoked =
+                            await db.RevokedAccessTokens
+                                .AnyAsync(r => r.Jti == jti);
+
                         if (revoked)
                         {
                             context.Fail("Token has been revoked.");
@@ -86,68 +131,120 @@ namespace PlayersClubsInfo
             });
 
             builder.Services.AddEndpointsApiExplorer();
+
             builder.Services.AddSwaggerGen(options =>
             {
-                options.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
-                {
-                    Name = "Authorization",
-                    Type = SecuritySchemeType.Http,
-                    Scheme = "bearer",
-                    BearerFormat = "JWT",
-                    In = ParameterLocation.Header,
-                    Description = "Enter your JWT token."
-                });
+                options.AddSecurityDefinition(
+                    "Bearer",
+                    new OpenApiSecurityScheme
+                    {
+                        Name = "Authorization",
+                        Type = SecuritySchemeType.Http,
+                        Scheme = "bearer",
+                        BearerFormat = "JWT",
+                        In = ParameterLocation.Header,
+                        Description = "Enter your JWT token."
+                    });
 
                 options.AddSecurityRequirement(document =>
                     new OpenApiSecurityRequirement
                     {
-                        [new OpenApiSecuritySchemeReference("Bearer", document)] = []
+                        [
+                            new OpenApiSecuritySchemeReference(
+                                "Bearer",
+                                document)
+                        ] = []
                     });
             });
 
             var app = builder.Build();
 
+            // =========================================================
+            // Database migration
+            // =========================================================
+
+            using (var scope = app.Services.CreateScope())
+            {
+                var db =
+                    scope.ServiceProvider
+                        .GetRequiredService<PlayersClubsInfoContext>();
+
+                try
+                {
+                    await db.Database.MigrateAsync();
+
+                    Console.WriteLine(
+                        "Database migrations applied successfully.");
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine(
+                        $"Database migration failed: {ex.Message}");
+
+                    throw;
+                }
+            }
+
+            // =========================================================
             // Seed roles and default root user
+            // =========================================================
+
             using (var scopeSeed = app.Services.CreateScope())
             {
-                await IdentitySeeder.SeedAsync(scopeSeed.ServiceProvider);
+                await IdentitySeeder.SeedAsync(
+                    scopeSeed.ServiceProvider);
             }
 
-            #region Test database connection
+            // =========================================================
             // Test database connection
-            using var scope = app.Services.CreateScope();
+            // =========================================================
 
-            var db = scope.ServiceProvider.GetRequiredService<PlayersClubsInfoContext>();
-
-            try
+            using (var scope = app.Services.CreateScope())
             {
-                if (db.Database.CanConnect())
+                var db =
+                    scope.ServiceProvider
+                        .GetRequiredService<PlayersClubsInfoContext>();
+
+                try
                 {
-                    Console.WriteLine("Database connection successful!");
+                    if (await db.Database.CanConnectAsync())
+                    {
+                        Console.WriteLine(
+                            "Database connection successful!");
+                    }
+                    else
+                    {
+                        Console.WriteLine(
+                            "Database connection failed!");
+                    }
                 }
-                else
+                catch (Exception ex)
                 {
-                    Console.WriteLine("Database connection failed!");
+                    Console.WriteLine(
+                        $"Database connection error: {ex.Message}");
                 }
             }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"Database connection error: {ex.Message}");
-            }
-            #endregion
 
-            // Configure the HTTP request pipeline.
+            // =========================================================
+            // HTTP request pipeline
+            // =========================================================
+
             if (app.Environment.IsDevelopment())
             {
                 app.MapScalarApiReference(options =>
                 {
-                    options.WithOpenApiRoutePattern("/swagger/{documentName}/swagger.json");
+                    options.WithOpenApiRoutePattern(
+                        "/swagger/{documentName}/swagger.json");
                 });
+
                 app.UseSwagger();
                 app.UseSwaggerUI();
             }
 
-            app.UseHttpsRedirection();
+            // HTTPS is intentionally not enabled for the initial
+            // Docker development setup.
+            //
+            // app.UseHttpsRedirection();
 
             app.UseAuthentication();
 
