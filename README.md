@@ -1,6 +1,6 @@
 # PlayersClubsInfo
 
-PlayersClubsInfo is a RESTful Practice-Only backend API for managing football clubs and players, with user authentication, role-based authorization, JWT access tokens, refresh-token rotation, token revocation, and PostgreSQL persistence.
+PlayersClubsInfo is a RESTful backend API for managing football clubs and players, with user authentication, role-based authorization, JWT access tokens, refresh-token rotation, token revocation, and PostgreSQL persistence.
 
 The project is implemented as an ASP.NET Core Web API and is designed as a practical backend project demonstrating CRUD operations, Entity Framework Core, ASP.NET Core Identity, JWT authentication, role-based authorization, PostgreSQL, and Docker-based development.
 
@@ -24,6 +24,7 @@ The project is implemented as an ASP.NET Core Web API and is designed as a pract
 - [Example API Workflow](#example-api-workflow)
 - [Entity Framework Core Migrations](#entity-framework-core-migrations)
 - [Docker Development Environment](#docker-development-environment)
+  - [Fedora / SELinux: Docker Secret Permission Denied](#fedora--selinux-docker-secret-permission-denied)
 - [Swagger and Scalar](#swagger-and-scalar)
 - [Project Structure](#project-structure)
 - [Security Notes](#security-notes)
@@ -1997,6 +1998,68 @@ secrets/
 ```
 
 These files should not be committed to Git.
+
+## Fedora / SELinux: Docker Secret Permission Denied
+
+When running Docker Compose on Fedora with SELinux enforcing, the PostgreSQL container may fail to start even when the secret files have normal Unix permissions such as `644`. A typical error is:
+
+```text
+/run/secrets/postgres-password: Permission denied
+```
+
+Check the SELinux state and labels:
+
+```bash
+getenforce
+ls -Zd secrets/
+ls -Z secrets/
+```
+
+If SELinux is `Enforcing` and the `secrets/` directory and its files are labeled `user_home_t`, the container may be denied access to the host-side secret files. Do not solve this by using `chmod 777` or by disabling SELinux.
+
+### Persistent SELinux solution
+
+Install the Fedora SELinux management utilities if necessary:
+
+```bash
+sudo dnf install policycoreutils-python-utils
+```
+
+From the project root, create a persistent SELinux file-context rule for the project's `secrets/` directory:
+
+```bash
+sudo semanage fcontext -a -t container_file_t "$(pwd)/secrets(/.*)?"
+```
+
+Apply the context:
+
+```bash
+sudo restorecon -Rv secrets/
+```
+
+Verify the result:
+
+```bash
+ls -Zd secrets/
+ls -Z secrets/
+```
+
+The files should now have an SELinux type of `container_file_t` instead of `user_home_t`. For example:
+
+```text
+unconfined_u:object_r:container_file_t:s0 secrets/
+```
+
+After applying the persistent context, restart the Compose environment:
+
+```bash
+sudo docker compose down -v
+sudo docker compose up --build
+```
+
+`semanage fcontext` is preferred over using `chcon` as the permanent solution because it records the desired file context in the SELinux policy configuration. `restorecon` then applies that policy to the files.
+
+This solution is specific to Fedora/SELinux environments. Other Linux distributions may not require this additional SELinux configuration.
 
 Start the development environment with:
 
