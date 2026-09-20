@@ -1,4 +1,4 @@
-# PlayersClubsInfo# PlayersClubsInfo
+# PlayersClubsInfo
 
 PlayersClubsInfo is a RESTful Practice-Only backend API for managing football clubs and players, with user authentication, role-based authorization, JWT access tokens, refresh-token rotation, token revocation, and PostgreSQL persistence.
 
