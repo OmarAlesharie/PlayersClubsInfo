@@ -1,6 +1,6 @@
 # PlayersClubsInfo
 
-PlayersClubsInfo is a RESTful backend API for managing football clubs and players, with user authentication, role-based authorization, JWT access tokens, refresh-token rotation, token revocation, and PostgreSQL persistence.
+PlayersClubsInfo is a Practice RESTful backend API Project for managing football clubs and players, with user authentication, role-based authorization, JWT access tokens, refresh-token rotation, token revocation, and PostgreSQL persistence.
 
 The project is implemented as an ASP.NET Core Web API and is designed as a practical backend project demonstrating CRUD operations, Entity Framework Core, ASP.NET Core Identity, JWT authentication, role-based authorization, PostgreSQL, and Docker-based development.
 
@@ -2215,30 +2215,691 @@ admin-password
 
 Change development credentials before using the application in any real environment.
 
-## Refresh Tokens
 
-Only hashes of refresh tokens are stored in the database.
+## Detailed Authentication & Token Management (JWT + Refresh Tokens + JTI Revocation)
 
-## Access Token Revocation
+This section documents the authentication architecture implemented by the project. It covers JWT access tokens, refresh tokens, JTI-based access-token revocation, refresh-token rotation, logout, logout-all, and background token cleanup.
 
-The JTI of a logged-out access token can be stored in `RevokedAccessTokens`.
+### Architecture overview
 
-Expired revoked-token records can be removed by the application's token cleanup service.
+The project uses a two-token model:
 
-## Development Configuration
+```text
+Client
+  │
+  ├── Login
+  ▼
+ASP.NET Core API
+  │
+  ├───────────────┬────────────────
+  ▼               ▼
+JWT Access      Refresh Token
+Token            (random secret)
+(short-lived)       │
+  │                 │ SHA-256
+  │                 ▼
+  │           RefreshTokens table
+  │           (hash only)
+  │
+  └── JTI
+       │
+       ▼
+RevokedAccessTokens
+```
 
-The Docker Compose configuration is intended for development. Production deployment should additionally address:
+- **Access token:** a short-lived, signed JWT used on normal API requests.
+- **Refresh token:** a long-lived cryptographically random value used to obtain a new access token.
+- **JTI:** a unique identifier contained in each access token. It allows the server to invalidate a JWT before its normal expiration time.
+- Refresh tokens are stored server-side only as SHA-256 hashes.
+- Refresh tokens are rotated when used.
+- Revoked access-token JTIs are checked by the JWT bearer validation pipeline.
 
-- HTTPS/TLS termination.
-- Production secret management.
-- Database backups.
-- Database network isolation.
-- Production logging and monitoring.
-- Key encryption/persistence strategy.
-- Secure cookie/client-side token handling where applicable.
-- Rate limiting and abuse protection.
-- Appropriate CORS policy.
-- Production PostgreSQL configuration.
+### Access token (JWT)
+
+`AuthController.GenerateJwtToken(...)` creates the access token.
+
+The JWT contains:
+
+- `ClaimTypes.NameIdentifier` — user ID.
+- `ClaimTypes.Name` — username.
+- `ClaimTypes.Role` — user roles.
+- `JwtRegisteredClaimNames.Jti` — unique GUID for this token.
+
+The token is signed with HMAC-SHA256 using `Jwt:Key` and expires according to `Jwt:ExpirationMinutes`.
+
+```csharp
+private (string Token, DateTime ExpiresAt) GenerateJwtToken(
+    ApplicationUser user,
+    IList<string> roles)
+{
+    var jwtKey = _configuration["Jwt:Key"]!;
+    var issuer = _configuration["Jwt:Issuer"]!;
+    var audience = _configuration["Jwt:Audience"]!;
+    var expirationMinutes =
+        _configuration.GetValue<int>("Jwt:ExpirationMinutes");
+
+    var expiresAt = DateTime.UtcNow.AddMinutes(expirationMinutes);
+
+    var claims = new List<Claim>
+    {
+        new(ClaimTypes.NameIdentifier, user.Id),
+        new(ClaimTypes.Name, user.UserName!),
+        new(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString())
+    };
+
+    foreach (var role in roles)
+        claims.Add(new Claim(ClaimTypes.Role, role));
+
+    var key = new SymmetricSecurityKey(
+        Encoding.UTF8.GetBytes(jwtKey));
+
+    var credentials = new SigningCredentials(
+        key,
+        SecurityAlgorithms.HmacSha256);
+
+    var token = new JwtSecurityToken(
+        issuer: issuer,
+        audience: audience,
+        claims: claims,
+        expires: expiresAt,
+        signingCredentials: credentials);
+
+    return (
+        new JwtSecurityTokenHandler().WriteToken(token),
+        expiresAt);
+}
+```
+
+### JWT validation and JTI revocation
+
+Normal JWT validation checks the issuer, audience, lifetime, and signing key. The project adds a database-backed revocation check after successful JWT validation.
+
+```csharp
+options.TokenValidationParameters = new TokenValidationParameters
+{
+    ValidateIssuer = true,
+    ValidateAudience = true,
+    ValidateLifetime = true,
+    ValidateIssuerSigningKey = true,
+
+    ValidIssuer = builder.Configuration["Jwt:Issuer"],
+    ValidAudience = builder.Configuration["Jwt:Audience"],
+
+    IssuerSigningKey = new SymmetricSecurityKey(
+        Encoding.UTF8.GetBytes(
+            builder.Configuration["Jwt:Key"]!)),
+
+    ClockSkew = TimeSpan.FromSeconds(30)
+};
+
+options.Events = new JwtBearerEvents
+{
+    OnTokenValidated = async context =>
+    {
+        var jti = context.Principal?
+            .FindFirst(JwtRegisteredClaimNames.Jti)?.Value;
+
+        if (string.IsNullOrEmpty(jti))
+            return;
+
+        var db = context.HttpContext.RequestServices
+            .GetRequiredService<PlayersClubsInfoContext>();
+
+        var revoked = await db.RevokedAccessTokens
+            .AnyAsync(r => r.Jti == jti);
+
+        if (revoked)
+            context.Fail("Token has been revoked.");
+    }
+};
+```
+
+Therefore, a JWT can be cryptographically valid but still rejected because its JTI has been revoked.
+
+---
+
+### Refresh tokens
+
+Refresh tokens are different from JWT access tokens:
+
+- 64 cryptographically random bytes are generated.
+- The value is Base64 encoded.
+- The raw token is returned to the client.
+- Only its SHA-256 hash is stored in PostgreSQL.
+- The example lifetime is 7 days.
+- The token can be revoked and rotated independently of the access token.
+
+#### RefreshToken model
+
+```csharp
+public class RefreshToken
+{
+    public int Id { get; set; }
+    public string UserId { get; set; } = null!;
+    public string TokenHash { get; set; } = null!;
+    public DateTime Created { get; set; }
+    public DateTime? RevokedAt { get; set; }
+    public bool Revoked { get; set; }
+    public DateTime Expires { get; set; }
+    public string? ReplacedByTokenHash { get; set; }
+}
+```
+
+#### Generating and hashing refresh tokens
+
+```csharp
+private static string GenerateSecureRefreshToken()
+{
+    var bytes = new byte[64];
+
+    using var rng = RandomNumberGenerator.Create();
+    rng.GetBytes(bytes);
+
+    return Convert.ToBase64String(bytes);
+}
+
+private static string HashToken(string token)
+{
+    using var sha = SHA256.Create();
+
+    var bytes = Encoding.UTF8.GetBytes(token);
+    var hash = sha.ComputeHash(bytes);
+
+    return Convert.ToBase64String(hash);
+}
+```
+
+The database therefore contains the hash rather than the usable refresh-token secret.
+
+---
+
+### Login: issue access + refresh tokens
+
+After successful password validation:
+
+```csharp
+var refreshToken = GenerateSecureRefreshToken();
+
+var refreshTokenRecord = new RefreshToken
+{
+    UserId = user.Id,
+    TokenHash = HashToken(refreshToken),
+    Created = DateTime.UtcNow,
+    Expires = DateTime.UtcNow.AddDays(7),
+    Revoked = false
+};
+
+await _db.RefreshTokens.AddAsync(refreshTokenRecord);
+await _db.SaveChangesAsync();
+
+var roles = await _userManager.GetRolesAsync(user);
+var token = GenerateJwtToken(user, roles);
+
+return Ok(new AuthResponseDto
+{
+    Token = token.Token,
+    ExpiresAt = token.ExpiresAt,
+    Username = user.UserName!,
+    Roles = roles,
+    RefreshToken = refreshToken
+});
+```
+
+The client receives a short-lived access token and a long-lived refresh token.
+
+---
+
+### Refresh-token rotation
+
+The client sends the refresh token to:
+
+```text
+POST /api/auth/refresh
+```
+
+The server hashes the supplied value and verifies that the corresponding record exists, is not revoked, and has not expired.
+
+On success, the existing refresh token is revoked and replaced by a newly generated refresh token.
+
+```csharp
+[HttpPost("refresh")]
+[AllowAnonymous]
+public async Task<IActionResult> Refresh(
+    [FromBody] RefreshRequestDto dto)
+{
+    if (string.IsNullOrWhiteSpace(dto.RefreshToken))
+        return BadRequest(new
+        {
+            message = "Refresh token is required."
+        });
+
+    var incomingHash = HashToken(dto.RefreshToken);
+
+    var existing = await _db.RefreshTokens
+        .FirstOrDefaultAsync(t => t.TokenHash == incomingHash);
+
+    if (existing == null ||
+        existing.Revoked ||
+        existing.Expires <= DateTime.UtcNow)
+    {
+        return Unauthorized(new
+        {
+            message = "Invalid or expired refresh token."
+        });
+    }
+
+    existing.Revoked = true;
+    existing.RevokedAt = DateTime.UtcNow;
+
+    var newRefreshToken = GenerateSecureRefreshToken();
+
+    var newRecord = new RefreshToken
+    {
+        UserId = existing.UserId,
+        TokenHash = HashToken(newRefreshToken),
+        Created = DateTime.UtcNow,
+        Expires = DateTime.UtcNow.AddDays(7),
+        Revoked = false
+    };
+
+    existing.ReplacedByTokenHash = newRecord.TokenHash;
+
+    _db.RefreshTokens.Add(newRecord);
+    await _db.SaveChangesAsync();
+
+    var user = await _userManager.FindByIdAsync(existing.UserId);
+    var roles = await _userManager.GetRolesAsync(user!);
+    var newJwt = GenerateJwtToken(user!, roles);
+
+    return Ok(new AuthResponseDto
+    {
+        Token = newJwt.Token,
+        ExpiresAt = newJwt.ExpiresAt,
+        Username = user!.UserName!,
+        Roles = roles,
+        RefreshToken = newRefreshToken
+    });
+}
+```
+
+The resulting token chain is:
+
+```text
+Refresh Token A
+      │
+      ├── used
+      ▼
+   REVOKED
+      │
+      └── replaced by → Refresh Token B
+                              │
+                              ├── used
+                              ▼
+                           REVOKED
+                              │
+                              └── replaced by → Refresh Token C
+```
+
+`ReplacedByTokenHash` preserves the relationship and can support auditing and future refresh-token reuse detection.
+
+---
+
+### Logout and immediate access-token invalidation
+
+The logout endpoint is:
+
+```text
+POST /api/auth/logout
+```
+
+and requires:
+
+```csharp
+[Authorize]
+```
+
+Logout handles both token types:
+
+1. If a refresh token is supplied, its database record is revoked.
+2. The current access token's JTI is stored in `RevokedAccessTokens`.
+3. The JTI record contains the token's expiration time.
+4. Subsequent requests using that JWT fail the `OnTokenValidated` revocation check.
+
+```csharp
+[HttpPost("logout")]
+[Authorize]
+public async Task<IActionResult> Logout(
+    [FromBody] RevokeRequestDto dto)
+{
+    var userId =
+        User.FindFirstValue(ClaimTypes.NameIdentifier);
+
+    if (userId == null)
+        return Unauthorized();
+
+    if (!string.IsNullOrWhiteSpace(dto?.RefreshToken))
+    {
+        var hash = HashToken(dto.RefreshToken);
+
+        var rtoken = await _db.RefreshTokens
+            .FirstOrDefaultAsync(
+                t => t.TokenHash == hash &&
+                     t.UserId == userId);
+
+        if (rtoken != null && !rtoken.Revoked)
+        {
+            rtoken.Revoked = true;
+            rtoken.RevokedAt = DateTime.UtcNow;
+        }
+    }
+
+    var jti =
+        User.FindFirstValue(JwtRegisteredClaimNames.Jti)
+        ?? User.FindFirstValue("jti");
+
+    if (!string.IsNullOrEmpty(jti))
+    {
+        DateTime expiresAt;
+
+        var expClaim =
+            User.FindFirstValue(JwtRegisteredClaimNames.Exp);
+
+        if (!string.IsNullOrEmpty(expClaim) &&
+            long.TryParse(expClaim, out var seconds))
+        {
+            expiresAt =
+                DateTimeOffset
+                    .FromUnixTimeSeconds(seconds)
+                    .UtcDateTime;
+        }
+        else
+        {
+            expiresAt = DateTime.UtcNow.AddMinutes(
+                _configuration.GetValue<int>(
+                    "Jwt:ExpirationMinutes"));
+        }
+
+        _db.RevokedAccessTokens.Add(
+            new RevokedAccessToken
+            {
+                Jti = jti,
+                ExpiresAt = expiresAt
+            });
+    }
+
+    await _db.SaveChangesAsync();
+
+    return Ok(new
+    {
+        message =
+            "Logout successful. Refresh token revoked " +
+            "and access token invalidated."
+    });
+}
+```
+
+### Why JTI is needed for logout
+
+JWT authentication is normally stateless. If a token is correctly signed and has not expired, it can normally be accepted without a server-side session lookup.
+
+That creates this situation:
+
+```text
+JWT issued
+    │
+    ├── valid for 15 minutes
+    │
+    └── user logs out after 2 minutes
+              │
+              ▼
+       JWT would normally
+       remain valid for 13 minutes
+```
+
+The project's JTI revocation mechanism changes this:
+
+```text
+JWT
+ └── JTI = unique-token-id
+             │
+             ▼
+     RevokedAccessTokens
+             │
+             └── JTI exists
+                    │
+                    ▼
+             context.Fail(...)
+                    │
+                    ▼
+                REJECT
+```
+
+This makes the current access token invalid immediately for subsequent requests.
+
+---
+
+### RevokedAccessToken model
+
+```csharp
+public class RevokedAccessToken
+{
+    public int Id { get; set; }
+    public string Jti { get; set; } = null!;
+    public DateTime ExpiresAt { get; set; }
+}
+```
+
+The EF Core context exposes:
+
+```csharp
+public DbSet<RefreshToken> RefreshTokens =>
+    Set<RefreshToken>();
+
+public DbSet<RevokedAccessToken> RevokedAccessTokens =>
+    Set<RevokedAccessToken>();
+```
+
+`RefreshToken.TokenHash` has a unique index, while revoked access tokens store the JTI and its expiration time.
+
+---
+
+### Logout-all
+
+The project also provides:
+
+```text
+POST /api/auth/logout-all
+```
+
+It revokes all currently active refresh tokens belonging to the authenticated user:
+
+```csharp
+[HttpPost("logout-all")]
+[Authorize]
+public async Task<IActionResult> LogoutAll()
+{
+    var userId =
+        User.FindFirstValue(ClaimTypes.NameIdentifier);
+
+    if (userId == null)
+        return Unauthorized();
+
+    var tokens = _db.RefreshTokens
+        .Where(t =>
+            t.UserId == userId &&
+            !t.Revoked);
+
+    await tokens.ForEachAsync(t =>
+    {
+        t.Revoked = true;
+        t.RevokedAt = DateTime.UtcNow;
+    });
+
+    await _db.SaveChangesAsync();
+
+    return Ok(new
+    {
+        message = "All refresh tokens revoked."
+    });
+}
+```
+
+This invalidates the user's refresh-token sessions. Existing access tokens are handled independently by their JWT lifetime and JTI revocation mechanism.
+
+---
+
+### Token cleanup background service
+
+`TokenCleanupService` periodically removes authentication records that no longer need to exist.
+
+It removes:
+
+- expired refresh tokens;
+- old revoked refresh tokens according to the retention policy;
+- expired revoked access-token JTIs.
+
+```csharp
+var expiredRefreshTokens =
+    await db.RefreshTokens
+        .Where(t => t.Expires <= DateTime.UtcNow)
+        .ToListAsync(ct);
+
+db.RefreshTokens.RemoveRange(expiredRefreshTokens);
+
+var oldRevoked =
+    await db.RefreshTokens
+        .Where(t =>
+            t.Revoked &&
+            t.RevokedAt != null &&
+            t.RevokedAt <=
+                DateTime.UtcNow.AddDays(-retentionDays))
+        .ToListAsync(ct);
+
+db.RefreshTokens.RemoveRange(oldRevoked);
+
+var expiredRevokedJtis =
+    await db.RevokedAccessTokens
+        .Where(r => r.ExpiresAt <= DateTime.UtcNow)
+        .ToListAsync(ct);
+
+db.RevokedAccessTokens.RemoveRange(expiredRevokedJtis);
+
+await db.SaveChangesAsync(ct);
+```
+
+`ExpiresAt` is important because once a JWT would have expired naturally, its JTI no longer needs to remain in the revocation table.
+
+---
+
+### Complete authentication lifecycle
+
+```text
+1. LOGIN
+   │
+   ├── username/password
+   ▼
+   Server
+   │
+   ├── Access JWT
+   │     └── short lifetime + unique JTI
+   │
+   └── Refresh token
+         └── raw value → client
+               hash → database
+
+2. NORMAL API REQUEST
+   │
+   └── Authorization: Bearer <access-token>
+          │
+          ▼
+       JwtBearer
+          │
+          ├── signature valid?
+          ├── issuer valid?
+          ├── audience valid?
+          ├── lifetime valid?
+          └── JTI revoked?
+                 │
+                 ├── yes → REJECT
+                 └── no  → ACCEPT
+
+3. ACCESS TOKEN EXPIRES
+   │
+   ▼
+   POST /api/auth/refresh
+   │
+   ├── hash refresh token
+   ├── find database record
+   ├── check not revoked
+   ├── check not expired
+   ├── revoke old refresh token
+   ├── create new refresh token
+   └── issue new JWT
+
+4. LOGOUT
+   │
+   ▼
+   POST /api/auth/logout
+   │
+   ├── revoke refresh token
+   └── store current access-token JTI
+          │
+          ▼
+      Future requests
+          │
+          └── JTI found → REJECT
+
+5. CLEANUP
+   │
+   └── TokenCleanupService
+          ├── remove expired refresh tokens
+          └── remove expired revoked JTIs
+```
+
+### Access token vs. refresh token
+
+| Property | Access Token | Refresh Token |
+|---|---|---|
+| Format | JWT | Random secret |
+| Purpose | Authenticate API requests | Obtain a new access token |
+| Lifetime | Short | Long |
+| Stored server-side | JTI only when revoked | SHA-256 hash |
+| Contains claims | Yes | No |
+| Signed | Yes | No; cryptographically random |
+| Rotated | New JWT on refresh | Yes |
+| Revoked on logout | Current JTI is recorded | Supplied token is revoked |
+| Used on normal API requests | Yes | No |
+
+### Expiration vs. revocation
+
+```text
+Expiration:
+JWT reaches its `exp` time
+        │
+        └── JwtBearer rejects it naturally
+
+Revocation:
+User logs out before `exp`
+        │
+        └── JTI stored in RevokedAccessTokens
+                │
+                └── JwtBearer rejects it immediately
+```
+
+Refresh tokens have their own independent expiration and revocation state.
+
+### Security considerations
+
+- Use HTTPS in production.
+- Keep access-token lifetime short and use refresh tokens for session continuation.
+- Store only hashed refresh tokens server-side.
+- Rotate refresh tokens when they are used.
+- `ReplacedByTokenHash` can support refresh-token reuse detection and auditing.
+- Consider device/session records when explicit per-device session management is required.
+- Rate-limit refresh endpoints.
+- Protect JWT signing keys and authentication secrets with appropriate secret management.
+- For larger deployments, consider asymmetric signing such as RS256 for key distribution and verification.
+
 
 ---
 
