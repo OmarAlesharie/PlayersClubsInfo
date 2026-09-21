@@ -33,6 +33,9 @@ The project is implemented as an ASP.NET Core Web API and is designed as a pract
 
 ## Project Purpose
 
+[⬆️ Back to Table of Contents](#table-of-contents)
+
+
 The purpose of PlayersClubsInfo is to provide a backend service for maintaining football club and player information.
 
 The API provides:
@@ -60,6 +63,9 @@ The project is API-only. A separate frontend or client can consume the REST endp
 
 ## Technology Stack
 
+[⬆️ Back to Table of Contents](#table-of-contents)
+
+
 | Technology | Purpose |
 |---|---|
 | **C#** | Primary programming language |
@@ -82,6 +88,9 @@ The project targets `net10.0`. Its main authentication, Identity, EF Core, OpenA
 ---
 
 ## Architecture
+
+[⬆️ Back to Table of Contents](#table-of-contents)
+
 
 The application follows a conventional ASP.NET Core Web API structure:
 
@@ -147,6 +156,9 @@ The database contains two groups of tables:
 
 ## Application tables
 
+[⬆️ Back to Table of Contents](#table-of-contents)
+
+
 The application-specific tables are:
 
 ```text
@@ -157,6 +169,9 @@ RevokedAccessTokens
 ```
 
 ## Identity tables
+
+[⬆️ Back to Table of Contents](#table-of-contents)
+
 
 ASP.NET Core Identity creates:
 
@@ -184,6 +199,9 @@ which records the migrations that have been applied to the database.
 
 ## Clubs
 
+[⬆️ Back to Table of Contents](#table-of-contents)
+
+
 The `Clubs` table stores football club information.
 
 | Column | Type | Description |
@@ -205,6 +223,9 @@ Example:
 ---
 
 ## Players
+
+[⬆️ Back to Table of Contents](#table-of-contents)
+
 
 The `Players` table stores football player information.
 
@@ -237,6 +258,9 @@ Example:
 
 ## RefreshTokens
 
+[⬆️ Back to Table of Contents](#table-of-contents)
+
+
 `RefreshTokens` stores hashed refresh tokens used to obtain new JWT access tokens.
 
 | Column | Type | Description |
@@ -258,6 +282,9 @@ A unique index exists on `TokenHash`.
 
 ## RevokedAccessTokens
 
+[⬆️ Back to Table of Contents](#table-of-contents)
+
+
 `RevokedAccessTokens` stores the JTI of invalidated JWT access tokens.
 
 | Column | Type | Description |
@@ -277,6 +304,9 @@ This allows an otherwise-valid JWT to be invalidated before its normal expiratio
 Identity manages users and roles through the standard Identity tables.
 
 ## AspNetUsers
+
+[⬆️ Back to Table of Contents](#table-of-contents)
+
 
 The project uses `ApplicationUser`, which currently derives directly from `IdentityUser`.
 
@@ -304,6 +334,9 @@ Passwords are handled by ASP.NET Core Identity and are stored as password hashes
 
 ## AspNetRoles
 
+[⬆️ Back to Table of Contents](#table-of-contents)
+
+
 Stores the application's roles.
 
 The application creates these roles automatically:
@@ -317,6 +350,9 @@ User
 ---
 
 ## AspNetUserRoles
+
+[⬆️ Back to Table of Contents](#table-of-contents)
+
 
 This table links users to roles.
 
@@ -339,6 +375,9 @@ AspNetRoles
 # Relationships
 
 ## Club -> Players
+
+[⬆️ Back to Table of Contents](#table-of-contents)
+
 
 The relationship is:
 
@@ -380,6 +419,9 @@ The application also explicitly releases the club's players before deleting the 
 
 ## User -> RefreshTokens
 
+[⬆️ Back to Table of Contents](#table-of-contents)
+
+
 The relationship is:
 
 ```text
@@ -397,6 +439,9 @@ Deleting a user cascades to their refresh tokens.
 The application uses two token types.
 
 ## Access Token
+
+[⬆️ Back to Table of Contents](#table-of-contents)
+
 
 The access token is a JWT.
 
@@ -427,6 +472,9 @@ Authorization: Bearer <JWT>
 
 ## Refresh Token
 
+[⬆️ Back to Table of Contents](#table-of-contents)
+
+
 Refresh tokens have a longer lifetime:
 
 ```text
@@ -449,6 +497,9 @@ This is refresh-token rotation.
 
 ## Logout
 
+[⬆️ Back to Table of Contents](#table-of-contents)
+
+
 Logout performs two actions when possible:
 
 1. Revokes the supplied refresh token.
@@ -459,6 +510,9 @@ Therefore the current access token can be rejected immediately instead of remain
 ---
 
 ## Logout All
+
+[⬆️ Back to Table of Contents](#table-of-contents)
+
 
 `logout-all` revokes all active refresh tokens belonging to the authenticated user.
 
@@ -501,6 +555,9 @@ The application has three roles.
 
 ## Root
 
+[⬆️ Back to Table of Contents](#table-of-contents)
+
+
 `Root` is the highest-privileged application role.
 
 Root can:
@@ -520,6 +577,9 @@ The default Root account is created by the application's identity seeding proces
 ---
 
 ## Manager
+
+[⬆️ Back to Table of Contents](#table-of-contents)
+
 
 `Manager` can manage football data but cannot manage users.
 
@@ -547,6 +607,9 @@ Managers cannot:
 ---
 
 ## User
+
+[⬆️ Back to Table of Contents](#table-of-contents)
+
 
 `User` has read access to football data.
 
@@ -614,7 +677,13 @@ with the refresh token returned by login or refresh.
 
 ## 1. Register
 
+[⬆️ Back to Table of Contents](#table-of-contents)
+
+
 ### Endpoint
+
+[⬆️ Back to Table of Contents](#table-of-contents)
+
 
 ```http
 POST /api/auth/register
@@ -622,15 +691,24 @@ POST /api/auth/register
 
 ### Authentication
 
+[⬆️ Back to Table of Contents](#table-of-contents)
+
+
 Anonymous.
 
 ### Purpose
+
+[⬆️ Back to Table of Contents](#table-of-contents)
+
 
 Creates a new user account.
 
 Every publicly registered account is assigned the `User` role automatically.
 
 ### Request
+
+[⬆️ Back to Table of Contents](#table-of-contents)
+
 
 ```json
 {
@@ -641,6 +719,9 @@ Every publicly registered account is assigned the `User` role automatically.
 ```
 
 ### Example
+
+[⬆️ Back to Table of Contents](#table-of-contents)
+
 
 ```bash
 curl -X POST http://localhost:8080/api/auth/register \
@@ -653,6 +734,9 @@ curl -X POST http://localhost:8080/api/auth/register \
 ```
 
 ### Success
+
+[⬆️ Back to Table of Contents](#table-of-contents)
+
 
 ```http
 201 Created
@@ -672,7 +756,13 @@ Password must be at least 8 characters.
 
 ## 2. Login
 
+[⬆️ Back to Table of Contents](#table-of-contents)
+
+
 ### Endpoint
+
+[⬆️ Back to Table of Contents](#table-of-contents)
+
 
 ```http
 POST /api/auth/login
@@ -680,9 +770,15 @@ POST /api/auth/login
 
 ### Authentication
 
+[⬆️ Back to Table of Contents](#table-of-contents)
+
+
 Anonymous.
 
 ### Purpose
+
+[⬆️ Back to Table of Contents](#table-of-contents)
+
 
 Authenticates a user and returns:
 
@@ -694,6 +790,9 @@ Authenticates a user and returns:
 
 ### Request
 
+[⬆️ Back to Table of Contents](#table-of-contents)
+
+
 ```json
 {
   "username": "root",
@@ -702,6 +801,9 @@ Authenticates a user and returns:
 ```
 
 ### Example
+
+[⬆️ Back to Table of Contents](#table-of-contents)
+
 
 ```bash
 curl -X POST http://localhost:8080/api/auth/login \
@@ -713,6 +815,9 @@ curl -X POST http://localhost:8080/api/auth/login \
 ```
 
 ### Response
+
+[⬆️ Back to Table of Contents](#table-of-contents)
+
 
 ```json
 {
@@ -730,7 +835,13 @@ curl -X POST http://localhost:8080/api/auth/login \
 
 ## 3. Logout
 
+[⬆️ Back to Table of Contents](#table-of-contents)
+
+
 ### Endpoint
+
+[⬆️ Back to Table of Contents](#table-of-contents)
+
 
 ```http
 POST /api/auth/logout
@@ -738,9 +849,15 @@ POST /api/auth/logout
 
 ### Authentication
 
+[⬆️ Back to Table of Contents](#table-of-contents)
+
+
 Required.
 
 ### Purpose
+
+[⬆️ Back to Table of Contents](#table-of-contents)
+
 
 Logs the current session out.
 
@@ -751,6 +868,9 @@ The endpoint can revoke:
 
 ### Request
 
+[⬆️ Back to Table of Contents](#table-of-contents)
+
+
 ```json
 {
   "refreshToken": "<REFRESH_TOKEN>"
@@ -758,6 +878,9 @@ The endpoint can revoke:
 ```
 
 ### Example
+
+[⬆️ Back to Table of Contents](#table-of-contents)
+
 
 ```bash
 curl -X POST http://localhost:8080/api/auth/logout \
@@ -770,6 +893,9 @@ curl -X POST http://localhost:8080/api/auth/logout \
 
 ### Response
 
+[⬆️ Back to Table of Contents](#table-of-contents)
+
+
 ```json
 {
   "message": "Logout successful. Refresh token revoked and access token invalidated."
@@ -780,7 +906,13 @@ curl -X POST http://localhost:8080/api/auth/logout \
 
 ## 4. Logout All
 
+[⬆️ Back to Table of Contents](#table-of-contents)
+
+
 ### Endpoint
+
+[⬆️ Back to Table of Contents](#table-of-contents)
+
 
 ```http
 POST /api/auth/logout-all
@@ -788,13 +920,22 @@ POST /api/auth/logout-all
 
 ### Authentication
 
+[⬆️ Back to Table of Contents](#table-of-contents)
+
+
 Required.
 
 ### Purpose
 
+[⬆️ Back to Table of Contents](#table-of-contents)
+
+
 Revokes all non-revoked refresh tokens belonging to the current user.
 
 ### Example
+
+[⬆️ Back to Table of Contents](#table-of-contents)
+
 
 ```bash
 curl -X POST http://localhost:8080/api/auth/logout-all \
@@ -802,6 +943,9 @@ curl -X POST http://localhost:8080/api/auth/logout-all \
 ```
 
 ### Response
+
+[⬆️ Back to Table of Contents](#table-of-contents)
+
 
 ```json
 {
@@ -813,7 +957,13 @@ curl -X POST http://localhost:8080/api/auth/logout-all \
 
 ## 5. Change Own Password
 
+[⬆️ Back to Table of Contents](#table-of-contents)
+
+
 ### Endpoint
+
+[⬆️ Back to Table of Contents](#table-of-contents)
+
 
 ```http
 PUT /api/auth/change-password
@@ -821,13 +971,22 @@ PUT /api/auth/change-password
 
 ### Authentication
 
+[⬆️ Back to Table of Contents](#table-of-contents)
+
+
 Required.
 
 ### Purpose
 
+[⬆️ Back to Table of Contents](#table-of-contents)
+
+
 Allows the authenticated user to change their own password.
 
 ### Request
+
+[⬆️ Back to Table of Contents](#table-of-contents)
+
 
 ```json
 {
@@ -837,6 +996,9 @@ Allows the authenticated user to change their own password.
 ```
 
 ### Example
+
+[⬆️ Back to Table of Contents](#table-of-contents)
+
 
 ```bash
 curl -X PUT http://localhost:8080/api/auth/change-password \
@@ -850,6 +1012,9 @@ curl -X PUT http://localhost:8080/api/auth/change-password \
 
 ### Response
 
+[⬆️ Back to Table of Contents](#table-of-contents)
+
+
 ```json
 {
   "message": "Password changed successfully."
@@ -860,7 +1025,13 @@ curl -X PUT http://localhost:8080/api/auth/change-password \
 
 ## 6. Refresh Access Token
 
+[⬆️ Back to Table of Contents](#table-of-contents)
+
+
 ### Endpoint
+
+[⬆️ Back to Table of Contents](#table-of-contents)
+
 
 ```http
 POST /api/auth/refresh
@@ -868,17 +1039,26 @@ POST /api/auth/refresh
 
 ### Authentication
 
+[⬆️ Back to Table of Contents](#table-of-contents)
+
+
 Anonymous.
 
 The refresh token itself is the credential.
 
 ### Purpose
 
+[⬆️ Back to Table of Contents](#table-of-contents)
+
+
 Obtains a new JWT access token without requiring the user to enter their password again.
 
 The old refresh token is revoked and replaced with a new refresh token.
 
 ### Request
+
+[⬆️ Back to Table of Contents](#table-of-contents)
+
 
 ```json
 {
@@ -887,6 +1067,9 @@ The old refresh token is revoked and replaced with a new refresh token.
 ```
 
 ### Example
+
+[⬆️ Back to Table of Contents](#table-of-contents)
+
 
 ```bash
 curl -X POST http://localhost:8080/api/auth/refresh \
@@ -897,6 +1080,9 @@ curl -X POST http://localhost:8080/api/auth/refresh \
 ```
 
 ### Response
+
+[⬆️ Back to Table of Contents](#table-of-contents)
+
 
 ```json
 {
@@ -916,13 +1102,22 @@ curl -X POST http://localhost:8080/api/auth/refresh \
 
 ## 7. Get All Clubs
 
+[⬆️ Back to Table of Contents](#table-of-contents)
+
+
 ### Endpoint
+
+[⬆️ Back to Table of Contents](#table-of-contents)
+
 
 ```http
 GET /api/clubs
 ```
 
 ### Roles
+
+[⬆️ Back to Table of Contents](#table-of-contents)
+
 
 ```text
 Root
@@ -931,6 +1126,9 @@ User
 ```
 
 ### Purpose
+
+[⬆️ Back to Table of Contents](#table-of-contents)
+
 
 Returns all clubs.
 
@@ -944,12 +1142,18 @@ Each club includes:
 
 ### Example
 
+[⬆️ Back to Table of Contents](#table-of-contents)
+
+
 ```bash
 curl http://localhost:8080/api/clubs \
   -H "Authorization: Bearer <token>"
 ```
 
 ### Response
+
+[⬆️ Back to Table of Contents](#table-of-contents)
+
 
 ```json
 [
@@ -980,13 +1184,22 @@ curl http://localhost:8080/api/clubs \
 
 ## 8. Get Club by ID
 
+[⬆️ Back to Table of Contents](#table-of-contents)
+
+
 ### Endpoint
+
+[⬆️ Back to Table of Contents](#table-of-contents)
+
 
 ```http
 GET /api/clubs/{id}
 ```
 
 ### Roles
+
+[⬆️ Back to Table of Contents](#table-of-contents)
+
 
 ```text
 Root
@@ -996,12 +1209,18 @@ User
 
 ### Example
 
+[⬆️ Back to Table of Contents](#table-of-contents)
+
+
 ```bash
 curl http://localhost:8080/api/clubs/1 \
   -H "Authorization: Bearer <token>"
 ```
 
 ### Response
+
+[⬆️ Back to Table of Contents](#table-of-contents)
+
 
 ```json
 {
@@ -1026,7 +1245,13 @@ Returns `404 Not Found` when the club does not exist.
 
 ## 9. Create Club
 
+[⬆️ Back to Table of Contents](#table-of-contents)
+
+
 ### Endpoint
+
+[⬆️ Back to Table of Contents](#table-of-contents)
+
 
 ```http
 POST /api/clubs
@@ -1034,12 +1259,18 @@ POST /api/clubs
 
 ### Roles
 
+[⬆️ Back to Table of Contents](#table-of-contents)
+
+
 ```text
 Root
 Manager
 ```
 
 ### Request
+
+[⬆️ Back to Table of Contents](#table-of-contents)
+
 
 ```json
 {
@@ -1049,6 +1280,9 @@ Manager
 ```
 
 ### Example
+
+[⬆️ Back to Table of Contents](#table-of-contents)
+
 
 ```bash
 curl -X POST http://localhost:8080/api/clubs \
@@ -1061,6 +1295,9 @@ curl -X POST http://localhost:8080/api/clubs \
 ```
 
 ### Response
+
+[⬆️ Back to Table of Contents](#table-of-contents)
+
 
 ```http
 201 Created
@@ -1080,7 +1317,13 @@ curl -X POST http://localhost:8080/api/clubs \
 
 ## 10. Update Club
 
+[⬆️ Back to Table of Contents](#table-of-contents)
+
+
 ### Endpoint
+
+[⬆️ Back to Table of Contents](#table-of-contents)
+
 
 ```http
 PUT /api/clubs/{id}
@@ -1088,12 +1331,18 @@ PUT /api/clubs/{id}
 
 ### Roles
 
+[⬆️ Back to Table of Contents](#table-of-contents)
+
+
 ```text
 Root
 Manager
 ```
 
 ### Request
+
+[⬆️ Back to Table of Contents](#table-of-contents)
+
 
 ```json
 {
@@ -1103,6 +1352,9 @@ Manager
 ```
 
 ### Example
+
+[⬆️ Back to Table of Contents](#table-of-contents)
+
 
 ```bash
 curl -X PUT http://localhost:8080/api/clubs/2 \
@@ -1116,13 +1368,22 @@ curl -X PUT http://localhost:8080/api/clubs/2 \
 
 ### Response
 
+[⬆️ Back to Table of Contents](#table-of-contents)
+
+
 The updated club is returned using the normal club response format.
 
 ---
 
 ## 11. Delete Club
 
+[⬆️ Back to Table of Contents](#table-of-contents)
+
+
 ### Endpoint
+
+[⬆️ Back to Table of Contents](#table-of-contents)
+
 
 ```http
 DELETE /api/clubs/{id}
@@ -1130,11 +1391,17 @@ DELETE /api/clubs/{id}
 
 ### Role
 
+[⬆️ Back to Table of Contents](#table-of-contents)
+
+
 ```text
 Root
 ```
 
 ### Purpose
+
+[⬆️ Back to Table of Contents](#table-of-contents)
+
 
 Deletes a club.
 
@@ -1142,12 +1409,18 @@ Players belonging to the club are released and become free agents instead of bei
 
 ### Example
 
+[⬆️ Back to Table of Contents](#table-of-contents)
+
+
 ```bash
 curl -X DELETE http://localhost:8080/api/clubs/2 \
   -H "Authorization: Bearer <root-token>"
 ```
 
 ### Response
+
+[⬆️ Back to Table of Contents](#table-of-contents)
+
 
 ```http
 204 No Content
@@ -1159,13 +1432,22 @@ curl -X DELETE http://localhost:8080/api/clubs/2 \
 
 ## 12. Get All Players
 
+[⬆️ Back to Table of Contents](#table-of-contents)
+
+
 ### Endpoint
+
+[⬆️ Back to Table of Contents](#table-of-contents)
+
 
 ```http
 GET /api/players
 ```
 
 ### Roles
+
+[⬆️ Back to Table of Contents](#table-of-contents)
+
 
 ```text
 Root
@@ -1175,12 +1457,18 @@ User
 
 ### Example
 
+[⬆️ Back to Table of Contents](#table-of-contents)
+
+
 ```bash
 curl http://localhost:8080/api/players \
   -H "Authorization: Bearer <token>"
 ```
 
 ### Response
+
+[⬆️ Back to Table of Contents](#table-of-contents)
+
 
 ```json
 [
@@ -1207,13 +1495,22 @@ curl http://localhost:8080/api/players \
 
 ## 13. Get Player by ID
 
+[⬆️ Back to Table of Contents](#table-of-contents)
+
+
 ### Endpoint
+
+[⬆️ Back to Table of Contents](#table-of-contents)
+
 
 ```http
 GET /api/players/{id}
 ```
 
 ### Roles
+
+[⬆️ Back to Table of Contents](#table-of-contents)
+
 
 ```text
 Root
@@ -1223,12 +1520,18 @@ User
 
 ### Example
 
+[⬆️ Back to Table of Contents](#table-of-contents)
+
+
 ```bash
 curl http://localhost:8080/api/players/1 \
   -H "Authorization: Bearer <token>"
 ```
 
 ### Response
+
+[⬆️ Back to Table of Contents](#table-of-contents)
+
 
 ```json
 {
@@ -1245,13 +1548,22 @@ curl http://localhost:8080/api/players/1 \
 
 ## 14. Create Player
 
+[⬆️ Back to Table of Contents](#table-of-contents)
+
+
 ### Endpoint
+
+[⬆️ Back to Table of Contents](#table-of-contents)
+
 
 ```http
 POST /api/players
 ```
 
 ### Roles
+
+[⬆️ Back to Table of Contents](#table-of-contents)
+
 
 ```text
 Root
@@ -1260,11 +1572,17 @@ Manager
 
 ### Purpose
 
+[⬆️ Back to Table of Contents](#table-of-contents)
+
+
 Creates a player.
 
 A player can optionally be assigned to a club immediately.
 
 ### Request
+
+[⬆️ Back to Table of Contents](#table-of-contents)
+
 
 ```json
 {
@@ -1288,6 +1606,9 @@ To create a free agent:
 
 ### Example
 
+[⬆️ Back to Table of Contents](#table-of-contents)
+
+
 ```bash
 curl -X POST http://localhost:8080/api/players \
   -H "Authorization: Bearer <token>" \
@@ -1306,7 +1627,13 @@ The specified club must exist.
 
 ## 15. Update Player
 
+[⬆️ Back to Table of Contents](#table-of-contents)
+
+
 ### Endpoint
+
+[⬆️ Back to Table of Contents](#table-of-contents)
+
 
 ```http
 PUT /api/players/{id}
@@ -1314,12 +1641,18 @@ PUT /api/players/{id}
 
 ### Roles
 
+[⬆️ Back to Table of Contents](#table-of-contents)
+
+
 ```text
 Root
 Manager
 ```
 
 ### Request
+
+[⬆️ Back to Table of Contents](#table-of-contents)
+
 
 ```json
 {
@@ -1334,6 +1667,9 @@ The DTO currently also contains a nullable `clubId` property, but the controller
 Club assignment is handled explicitly by the transfer and release endpoints.
 
 ### Example
+
+[⬆️ Back to Table of Contents](#table-of-contents)
+
 
 ```bash
 curl -X PUT http://localhost:8080/api/players/1 \
@@ -1350,7 +1686,13 @@ curl -X PUT http://localhost:8080/api/players/1 \
 
 ## 16. Delete Player
 
+[⬆️ Back to Table of Contents](#table-of-contents)
+
+
 ### Endpoint
+
+[⬆️ Back to Table of Contents](#table-of-contents)
+
 
 ```http
 DELETE /api/players/{id}
@@ -1358,11 +1700,17 @@ DELETE /api/players/{id}
 
 ### Role
 
+[⬆️ Back to Table of Contents](#table-of-contents)
+
+
 ```text
 Root
 ```
 
 ### Example
+
+[⬆️ Back to Table of Contents](#table-of-contents)
+
 
 ```bash
 curl -X DELETE http://localhost:8080/api/players/1 \
@@ -1370,6 +1718,9 @@ curl -X DELETE http://localhost:8080/api/players/1 \
 ```
 
 ### Response
+
+[⬆️ Back to Table of Contents](#table-of-contents)
+
 
 ```http
 204 No Content
@@ -1379,13 +1730,22 @@ curl -X DELETE http://localhost:8080/api/players/1 \
 
 ## 17. Transfer Player
 
+[⬆️ Back to Table of Contents](#table-of-contents)
+
+
 ### Endpoint
+
+[⬆️ Back to Table of Contents](#table-of-contents)
+
 
 ```http
 POST /api/players/{id}/transfer
 ```
 
 ### Roles
+
+[⬆️ Back to Table of Contents](#table-of-contents)
+
 
 ```text
 Root
@@ -1394,9 +1754,15 @@ Manager
 
 ### Purpose
 
+[⬆️ Back to Table of Contents](#table-of-contents)
+
+
 Moves a player to another club.
 
 ### Request
+
+[⬆️ Back to Table of Contents](#table-of-contents)
+
 
 ```json
 {
@@ -1405,6 +1771,9 @@ Moves a player to another club.
 ```
 
 ### Example
+
+[⬆️ Back to Table of Contents](#table-of-contents)
+
 
 ```bash
 curl -X POST http://localhost:8080/api/players/1/transfer \
@@ -1423,13 +1792,22 @@ The request fails if the player already belongs to the destination club.
 
 ## 18. Release Player
 
+[⬆️ Back to Table of Contents](#table-of-contents)
+
+
 ### Endpoint
+
+[⬆️ Back to Table of Contents](#table-of-contents)
+
 
 ```http
 POST /api/players/{id}/release
 ```
 
 ### Roles
+
+[⬆️ Back to Table of Contents](#table-of-contents)
+
 
 ```text
 Root
@@ -1438,9 +1816,15 @@ Manager
 
 ### Purpose
 
+[⬆️ Back to Table of Contents](#table-of-contents)
+
+
 Removes the player's club assignment and makes the player a free agent.
 
 ### Example
+
+[⬆️ Back to Table of Contents](#table-of-contents)
+
 
 ```bash
 curl -X POST http://localhost:8080/api/players/1/release \
@@ -1448,6 +1832,9 @@ curl -X POST http://localhost:8080/api/players/1/release \
 ```
 
 ### Response
+
+[⬆️ Back to Table of Contents](#table-of-contents)
+
 
 The updated player is returned with:
 
@@ -1474,7 +1861,13 @@ Managers and normal Users cannot access these endpoints.
 
 ## 19. Get All Users
 
+[⬆️ Back to Table of Contents](#table-of-contents)
+
+
 ### Endpoint
+
+[⬆️ Back to Table of Contents](#table-of-contents)
+
 
 ```http
 GET /api/users
@@ -1482,11 +1875,17 @@ GET /api/users
 
 ### Role
 
+[⬆️ Back to Table of Contents](#table-of-contents)
+
+
 ```text
 Root
 ```
 
 ### Example
+
+[⬆️ Back to Table of Contents](#table-of-contents)
+
 
 ```bash
 curl http://localhost:8080/api/users \
@@ -1494,6 +1893,9 @@ curl http://localhost:8080/api/users \
 ```
 
 ### Response
+
+[⬆️ Back to Table of Contents](#table-of-contents)
+
 
 ```json
 [
@@ -1514,7 +1916,13 @@ curl http://localhost:8080/api/users \
 
 ## 20. Get User by ID
 
+[⬆️ Back to Table of Contents](#table-of-contents)
+
+
 ### Endpoint
+
+[⬆️ Back to Table of Contents](#table-of-contents)
+
 
 ```http
 GET /api/users/{id}
@@ -1522,11 +1930,17 @@ GET /api/users/{id}
 
 ### Role
 
+[⬆️ Back to Table of Contents](#table-of-contents)
+
+
 ```text
 Root
 ```
 
 ### Example
+
+[⬆️ Back to Table of Contents](#table-of-contents)
+
 
 ```bash
 curl http://localhost:8080/api/users/<user-id> \
@@ -1537,7 +1951,13 @@ curl http://localhost:8080/api/users/<user-id> \
 
 ## 21. Create User
 
+[⬆️ Back to Table of Contents](#table-of-contents)
+
+
 ### Endpoint
+
+[⬆️ Back to Table of Contents](#table-of-contents)
+
 
 ```http
 POST /api/users
@@ -1545,11 +1965,17 @@ POST /api/users
 
 ### Role
 
+[⬆️ Back to Table of Contents](#table-of-contents)
+
+
 ```text
 Root
 ```
 
 ### Purpose
+
+[⬆️ Back to Table of Contents](#table-of-contents)
+
 
 Creates a user and assigns one of the existing roles.
 
@@ -1563,6 +1989,9 @@ User
 
 ### Request
 
+[⬆️ Back to Table of Contents](#table-of-contents)
+
+
 ```json
 {
   "username": "manager1",
@@ -1573,6 +2002,9 @@ User
 ```
 
 ### Example
+
+[⬆️ Back to Table of Contents](#table-of-contents)
+
 
 ```bash
 curl -X POST http://localhost:8080/api/users \
@@ -1590,7 +2022,13 @@ curl -X POST http://localhost:8080/api/users \
 
 ## 22. Update User
 
+[⬆️ Back to Table of Contents](#table-of-contents)
+
+
 ### Endpoint
+
+[⬆️ Back to Table of Contents](#table-of-contents)
+
 
 ```http
 PUT /api/users/{id}
@@ -1598,11 +2036,17 @@ PUT /api/users/{id}
 
 ### Role
 
+[⬆️ Back to Table of Contents](#table-of-contents)
+
+
 ```text
 Root
 ```
 
 ### Purpose
+
+[⬆️ Back to Table of Contents](#table-of-contents)
+
 
 Updates:
 
@@ -1611,6 +2055,9 @@ Updates:
 - Lockout setting.
 
 ### Request
+
+[⬆️ Back to Table of Contents](#table-of-contents)
+
 
 ```json
 {
@@ -1621,6 +2068,9 @@ Updates:
 ```
 
 ### Example
+
+[⬆️ Back to Table of Contents](#table-of-contents)
+
 
 ```bash
 curl -X PUT http://localhost:8080/api/users/<user-id> \
@@ -1639,7 +2089,13 @@ The endpoint replaces the user's existing roles with the supplied role.
 
 ## 23. Delete User
 
+[⬆️ Back to Table of Contents](#table-of-contents)
+
+
 ### Endpoint
+
+[⬆️ Back to Table of Contents](#table-of-contents)
+
 
 ```http
 DELETE /api/users/{id}
@@ -1647,11 +2103,17 @@ DELETE /api/users/{id}
 
 ### Role
 
+[⬆️ Back to Table of Contents](#table-of-contents)
+
+
 ```text
 Root
 ```
 
 ### Example
+
+[⬆️ Back to Table of Contents](#table-of-contents)
+
 
 ```bash
 curl -X DELETE http://localhost:8080/api/users/<user-id> \
@@ -1662,6 +2124,9 @@ A Root user cannot delete their own account.
 
 ### Response
 
+[⬆️ Back to Table of Contents](#table-of-contents)
+
+
 ```http
 204 No Content
 ```
@@ -1670,7 +2135,13 @@ A Root user cannot delete their own account.
 
 ## 24. Reset Another User's Password
 
+[⬆️ Back to Table of Contents](#table-of-contents)
+
+
 ### Endpoint
+
+[⬆️ Back to Table of Contents](#table-of-contents)
+
 
 ```http
 PUT /api/users/{id}/password
@@ -1678,15 +2149,24 @@ PUT /api/users/{id}/password
 
 ### Role
 
+[⬆️ Back to Table of Contents](#table-of-contents)
+
+
 ```text
 Root
 ```
 
 ### Purpose
 
+[⬆️ Back to Table of Contents](#table-of-contents)
+
+
 Allows Root to set a new password for another user.
 
 ### Request
+
+[⬆️ Back to Table of Contents](#table-of-contents)
+
 
 ```json
 {
@@ -1695,6 +2175,9 @@ Allows Root to set a new password for another user.
 ```
 
 ### Example
+
+[⬆️ Back to Table of Contents](#table-of-contents)
+
 
 ```bash
 curl -X PUT http://localhost:8080/api/users/<user-id>/password \
@@ -1706,6 +2189,9 @@ curl -X PUT http://localhost:8080/api/users/<user-id>/password \
 ```
 
 ### Response
+
+[⬆️ Back to Table of Contents](#table-of-contents)
+
 
 ```json
 {
@@ -1719,6 +2205,9 @@ curl -X PUT http://localhost:8080/api/users/<user-id>/password \
 
 ## Authentication endpoints
 
+[⬆️ Back to Table of Contents](#table-of-contents)
+
+
 | Endpoint | Anonymous | Authenticated | Root | Manager | User |
 |---|:---:|:---:|:---:|:---:|:---:|
 | `POST /api/auth/register` | Yes | Yes | Yes | Yes | Yes |
@@ -1730,6 +2219,9 @@ curl -X PUT http://localhost:8080/api/users/<user-id>/password \
 
 ## Club endpoints
 
+[⬆️ Back to Table of Contents](#table-of-contents)
+
+
 | Endpoint | Root | Manager | User |
 |---|:---:|:---:|:---:|
 | `GET /api/clubs` | Yes | Yes | Yes |
@@ -1739,6 +2231,9 @@ curl -X PUT http://localhost:8080/api/users/<user-id>/password \
 | `DELETE /api/clubs/{id}` | Yes | No | No |
 
 ## Player endpoints
+
+[⬆️ Back to Table of Contents](#table-of-contents)
+
 
 | Endpoint | Root | Manager | User |
 |---|:---:|:---:|:---:|
@@ -1751,6 +2246,9 @@ curl -X PUT http://localhost:8080/api/users/<user-id>/password \
 | `POST /api/players/{id}/release` | Yes | Yes | No |
 
 ## User-management endpoints
+
+[⬆️ Back to Table of Contents](#table-of-contents)
+
 
 | Endpoint | Root | Manager | User |
 |---|:---:|:---:|:---:|
@@ -1786,6 +2284,9 @@ A normal client workflow can look like this.
 
 ## Step 1: Register
 
+[⬆️ Back to Table of Contents](#table-of-contents)
+
+
 ```http
 POST /api/auth/register
 ```
@@ -1801,6 +2302,9 @@ POST /api/auth/register
 The newly registered account receives the `User` role.
 
 ## Step 2: Root changes the user's role
+
+[⬆️ Back to Table of Contents](#table-of-contents)
+
 
 Root creates or updates the user:
 
@@ -1818,6 +2322,9 @@ PUT /api/users/{id}
 
 ## Step 3: Manager logs in
 
+[⬆️ Back to Table of Contents](#table-of-contents)
+
+
 ```http
 POST /api/auth/login
 ```
@@ -1834,6 +2341,9 @@ Roles
 
 ## Step 4: Manager creates a club
 
+[⬆️ Back to Table of Contents](#table-of-contents)
+
+
 ```http
 POST /api/clubs
 Authorization: Bearer <token>
@@ -1847,6 +2357,9 @@ Authorization: Bearer <token>
 ```
 
 ## Step 5: Manager creates a player
+
+[⬆️ Back to Table of Contents](#table-of-contents)
+
 
 ```http
 POST /api/players
@@ -1864,6 +2377,9 @@ Authorization: Bearer <token>
 
 ## Step 6: Manager transfers the player
 
+[⬆️ Back to Table of Contents](#table-of-contents)
+
+
 ```http
 POST /api/players/1/transfer
 Authorization: Bearer <token>
@@ -1876,6 +2392,9 @@ Authorization: Bearer <token>
 ```
 
 ## Step 7: Access token expires
+
+[⬆️ Back to Table of Contents](#table-of-contents)
+
 
 The client uses the refresh token:
 
@@ -1892,6 +2411,9 @@ POST /api/auth/refresh
 The server returns a new access token and a new refresh token.
 
 ## Step 8: Logout
+
+[⬆️ Back to Table of Contents](#table-of-contents)
+
 
 ```http
 POST /api/auth/logout
@@ -2001,6 +2523,9 @@ These files should not be committed to Git.
 
 ## Fedora / SELinux: Docker Secret Permission Denied
 
+[⬆️ Back to Table of Contents](#table-of-contents)
+
+
 When running Docker Compose on Fedora with SELinux enforcing, the PostgreSQL container may fail to start even when the secret files have normal Unix permissions such as `644`. A typical error is:
 
 ```text
@@ -2018,6 +2543,9 @@ ls -Z secrets/
 If SELinux is `Enforcing` and the `secrets/` directory and its files are labeled `user_home_t`, the container may be denied access to the host-side secret files. Do not solve this by using `chmod 777` or by disabling SELinux.
 
 ### Persistent SELinux solution
+
+[⬆️ Back to Table of Contents](#table-of-contents)
+
 
 Install the Fedora SELinux management utilities if necessary:
 
@@ -2183,9 +2711,15 @@ PlayersClubsInfo/
 
 ## Passwords
 
+[⬆️ Back to Table of Contents](#table-of-contents)
+
+
 Passwords are managed by ASP.NET Core Identity and are not stored as plain text.
 
 ## JWT Signing Key
+
+[⬆️ Back to Table of Contents](#table-of-contents)
+
 
 The JWT signing key should be kept outside source control.
 
@@ -2197,6 +2731,9 @@ jwt-key
 
 ## PostgreSQL Password
 
+[⬆️ Back to Table of Contents](#table-of-contents)
+
+
 The PostgreSQL password should be supplied through:
 
 ```text
@@ -2206,6 +2743,9 @@ postgres-password
 rather than being committed to `appsettings.json`.
 
 ## Root Password
+
+[⬆️ Back to Table of Contents](#table-of-contents)
+
 
 The default development Root password is supplied through:
 
@@ -2218,9 +2758,15 @@ Change development credentials before using the application in any real environm
 
 ## Detailed Authentication & Token Management (JWT + Refresh Tokens + JTI Revocation)
 
+[⬆️ Back to Table of Contents](#table-of-contents)
+
+
 This section documents the authentication architecture implemented by the project. It covers JWT access tokens, refresh tokens, JTI-based access-token revocation, refresh-token rotation, logout, logout-all, and background token cleanup.
 
 ### Architecture overview
+
+[⬆️ Back to Table of Contents](#table-of-contents)
+
 
 The project uses a two-token model:
 
@@ -2255,6 +2801,9 @@ RevokedAccessTokens
 - Revoked access-token JTIs are checked by the JWT bearer validation pipeline.
 
 ### Access token (JWT)
+
+[⬆️ Back to Table of Contents](#table-of-contents)
+
 
 `AuthController.GenerateJwtToken(...)` creates the access token.
 
@@ -2312,6 +2861,9 @@ private (string Token, DateTime ExpiresAt) GenerateJwtToken(
 
 ### JWT validation and JTI revocation
 
+[⬆️ Back to Table of Contents](#table-of-contents)
+
+
 Normal JWT validation checks the issuer, audience, lifetime, and signing key. The project adds a database-backed revocation check after successful JWT validation.
 
 ```csharp
@@ -2360,6 +2912,9 @@ Therefore, a JWT can be cryptographically valid but still rejected because its J
 
 ### Refresh tokens
 
+[⬆️ Back to Table of Contents](#table-of-contents)
+
+
 Refresh tokens are different from JWT access tokens:
 
 - 64 cryptographically random bytes are generated.
@@ -2370,6 +2925,9 @@ Refresh tokens are different from JWT access tokens:
 - The token can be revoked and rotated independently of the access token.
 
 #### RefreshToken model
+
+[⬆️ Back to Table of Contents](#table-of-contents)
+
 
 ```csharp
 public class RefreshToken
@@ -2386,6 +2944,9 @@ public class RefreshToken
 ```
 
 #### Generating and hashing refresh tokens
+
+[⬆️ Back to Table of Contents](#table-of-contents)
+
 
 ```csharp
 private static string GenerateSecureRefreshToken()
@@ -2414,6 +2975,9 @@ The database therefore contains the hash rather than the usable refresh-token se
 ---
 
 ### Login: issue access + refresh tokens
+
+[⬆️ Back to Table of Contents](#table-of-contents)
+
 
 After successful password validation:
 
@@ -2450,6 +3014,9 @@ The client receives a short-lived access token and a long-lived refresh token.
 ---
 
 ### Refresh-token rotation
+
+[⬆️ Back to Table of Contents](#table-of-contents)
+
 
 The client sends the refresh token to:
 
@@ -2546,6 +3113,9 @@ Refresh Token A
 
 ### Logout and immediate access-token invalidation
 
+[⬆️ Back to Table of Contents](#table-of-contents)
+
+
 The logout endpoint is:
 
 ```text
@@ -2640,6 +3210,9 @@ public async Task<IActionResult> Logout(
 
 ### Why JTI is needed for logout
 
+[⬆️ Back to Table of Contents](#table-of-contents)
+
+
 JWT authentication is normally stateless. If a token is correctly signed and has not expired, it can normally be accepted without a server-side session lookup.
 
 That creates this situation:
@@ -2680,6 +3253,9 @@ This makes the current access token invalid immediately for subsequent requests.
 
 ### RevokedAccessToken model
 
+[⬆️ Back to Table of Contents](#table-of-contents)
+
+
 ```csharp
 public class RevokedAccessToken
 {
@@ -2704,6 +3280,9 @@ public DbSet<RevokedAccessToken> RevokedAccessTokens =>
 ---
 
 ### Logout-all
+
+[⬆️ Back to Table of Contents](#table-of-contents)
+
 
 The project also provides:
 
@@ -2750,6 +3329,9 @@ This invalidates the user's refresh-token sessions. Existing access tokens are h
 
 ### Token cleanup background service
 
+[⬆️ Back to Table of Contents](#table-of-contents)
+
+
 `TokenCleanupService` periodically removes authentication records that no longer need to exist.
 
 It removes:
@@ -2792,6 +3374,9 @@ await db.SaveChangesAsync(ct);
 ---
 
 ### Complete authentication lifecycle
+
+[⬆️ Back to Table of Contents](#table-of-contents)
+
 
 ```text
 1. LOGIN
@@ -2858,6 +3443,9 @@ await db.SaveChangesAsync(ct);
 
 ### Access token vs. refresh token
 
+[⬆️ Back to Table of Contents](#table-of-contents)
+
+
 | Property | Access Token | Refresh Token |
 |---|---|---|
 | Format | JWT | Random secret |
@@ -2871,6 +3459,9 @@ await db.SaveChangesAsync(ct);
 | Used on normal API requests | Yes | No |
 
 ### Expiration vs. revocation
+
+[⬆️ Back to Table of Contents](#table-of-contents)
+
 
 ```text
 Expiration:
@@ -2889,6 +3480,9 @@ User logs out before `exp`
 Refresh tokens have their own independent expiration and revocation state.
 
 ### Security considerations
+
+[⬆️ Back to Table of Contents](#table-of-contents)
+
 
 - Use HTTPS in production.
 - Keep access-token lifetime short and use refresh tokens for session continuation.
